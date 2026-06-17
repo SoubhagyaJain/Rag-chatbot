@@ -1,0 +1,47 @@
+# Environment
+.env
+.env.docker
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Persisted index and runtime artifacts
+storage/*
+!storage/.gitkeep
+
+# Logs
+logs/*
+!logs/.gitkeep
+app/logs/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Chainlit
+.chainlit/
+.files/
+
+# Optional: keep PDFs local only (uncomment if sensitive)
+# data/policies/*.pdf
+# data/legal/*.pdf

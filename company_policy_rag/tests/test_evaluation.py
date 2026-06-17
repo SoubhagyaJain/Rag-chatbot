@@ -1,0 +1,75 @@
+"""Unit tests for evaluation framework (no Ollama required)."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+from llama_index.core.schema import NodeWithScore, TextNode
+
+from src.evaluation import (
+    RELEVANCY_PROMPT,
+    GoldenCase,
+    compute_retrieval_metrics,
+    is_chunk_relevant,
+    load_golden_dataset,
+)
+
+
+def _node(text: str, **meta: str | int) -> NodeWithScore:
+    return NodeWithScore(node=TextNode(text=text, metadata=dict(meta)), score=0.8)
+
+
+class TestRelevanceMatching:
+    def test_section_path_match(self) -> None:
+        node = _node(
+            "Employees accrue 15 days of vacation annually.",
+            section_path="II. GENERAL > 5.2 Vacation Benefits",
+            section_title="Vacation Benefits",
+        )
+        assert is_chunk_relevant(node, ["vacation", "leave"])
+
+    def test_no_match(self) -> None:
+        node = _node("Dress code requires business casual.", section_title="Dress Code")
+        assert not is_chunk_relevant(node, ["harassment", "discrimination"])
+
+    def test_empty_sections_not_relevant(self) -> None:
+        node = _node("Some text about pets.")
+        assert not is_chunk_relevant(node, [])
+
+
+class TestRetrievalMetrics:
+    def test_hit_rate_and_precision(self) -> None:
+        nodes = [
+            _node("Vacation policy details", section_title="Vacation"),
+            _node("Unrelated dress code", section_title="Dress Code"),
+        ]
+        hit, prec, rec, rel, _ = compute_retrieval_metrics(nodes, ["vacation"])
+        assert hit == 1.0
+        assert prec == 0.5
+        assert rel == 1
+
+    def test_empty_retrieval(self) -> None:
+        hit, prec, rec, _, _ = compute_retrieval_metrics([], ["vacation"])
+        assert hit == 0.0
+        assert prec == 0.0
+
+
+class TestGoldenDataset:
+    def test_load_dataset(self) -> None:
+        cases = load_golden_dataset()
+        assert len(cases) >= 10
+        assert all(isinstance(c, GoldenCase) for c in cases)
+        categories = {c.category for c in cases}
+        assert "factual" in categories
+        assert "edge_case" in categories
+
+    def test_dataset_file_exists(self) -> None:
+        path = Path(__file__).resolve().parent.parent / "data" / "eval" / "golden_dataset.json"
+        assert path.exists()
+
+
+def test_relevancy_prompt_includes_context() -> None:
+    assert "CONTEXT:" in RELEVANCY_PROMPT
+    assert "{context}" in RELEVANCY_PROMPT
+    assert "semantic-mapping" in RELEVANCY_PROMPT.lower()

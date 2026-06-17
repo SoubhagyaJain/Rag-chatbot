@@ -1,0 +1,42 @@
+# Core RAG framework
+llama-index>=0.12.0
+llama-index-core>=0.12.0
+llama-index-llms-ollama>=0.4.0
+llama-index-embeddings-ollama>=0.4.0
+llama-index-readers-file>=0.4.0
+llama-index-vector-stores-chroma>=0.4.0
+llama-index-postprocessor-sbert-rerank>=0.3.0
+
+# ── Reranker (cross-encoder) — required for Context Precision ───────────────
+# sentence-transformers is lightweight; install with core requirements.
+sentence-transformers>=3.0.0
+#
+# torch + torchvision are NOT pinned here — install separately for CPU or GPU (see README):
+#   CPU:  pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+#   GPU:  pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+# Verify: python -c "from src.retriever import get_reranker; print(get_reranker())"
+
+# Vector database (persistent, metadata filtering)
+chromadb>=0.5.0,<1.0.0
+# chromadb 0.5.x expects posthog 2.x capture(distinct_id, event, properties)
+posthog>=2.4.0,<3.0.0
+
+# PDF extraction
+pypdf>=5.0.0
+
+# Chat UI
+streamlit>=1.32.0
+chainlit>=2.0.0
+
+# Config & utilities
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Evaluation & exploration (notebook)
+jupyter>=1.0.0
+ipykernel>=6.0.0
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.24.0

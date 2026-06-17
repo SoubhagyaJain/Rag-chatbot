@@ -1,0 +1,30 @@
+# Virtual env & caches
+.venv/
+venv/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Git & IDE
+.git/
+.gitignore
+.idea/
+.vscode/
+
+# Runtime data (mounted as volumes)
+storage/chroma/**
+logs/*.log
+logs/evaluation_results.json
+
+# Local env
+.env
+
+# Dev / notebooks
+notebooks/
+README2.md
+
+# Docker build context noise
+*.md
+!data/eval/**
