@@ -311,6 +311,19 @@ def _delete_chunks_for_source(collection: Collection, source_file: str) -> None:
         logger.warning("Could not delete chunks for %s: %s", source_file, exc)
 
 
+def remove_document_from_index(source_file: str) -> int:
+    """Remove all Chroma chunks whose source_file metadata matches the basename."""
+    collection = get_chroma_collection()
+    try:
+        peek = collection.get(where={"source_file": source_file}, include=[])
+        count = len(peek.get("ids") or [])
+    except Exception as exc:
+        logger.warning("Could not count chunks for %s: %s", source_file, exc)
+        count = 0
+    _delete_chunks_for_source(collection, source_file)
+    return count
+
+
 def _filter_paths_for_incremental(
     pdf_paths: list[Path],
     collection: Collection,

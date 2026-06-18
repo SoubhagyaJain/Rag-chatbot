@@ -33,8 +33,10 @@ from llama_index.core.memory import ChatMemoryBuffer
 from src.agent import AgentTurnResult, chat_with_memory, create_agent, configure_llm
 from src.config import settings
 from src.document_upload import (
+    RemoveDocumentResult,
     index_legal_paths,
     list_legal_documents,
+    remove_legal_document,
     save_legal_pdf,
 )
 from src.indexing import (
@@ -233,6 +235,20 @@ def _show_upload_outcome(result: IndexingResult | None, error: str | None, *, co
     return False
 
 
+def _process_legal_removal(filename: str) -> tuple[RemoveDocumentResult | None, str | None]:
+    """Remove a legal PDF from disk and the search index."""
+    try:
+        result = remove_legal_document(filename)
+        return result, None
+    except FileNotFoundError as exc:
+        return None, str(exc)
+    except ValueError as exc:
+        return None, str(exc)
+    except Exception as exc:
+        logger.exception("Legal document removal failed")
+        return None, f"Removal failed: {exc}"
+
+
 def _process_legal_uploads(uploaded_files: list[Any]) -> tuple[list[Path], IndexingResult | None, str | None]:
     """Save uploaded PDFs and run incremental indexing. Returns paths, result, error."""
     if not uploaded_files:
@@ -385,10 +401,50 @@ def _render_sidebar_status() -> None:
         _render_legal_upload_sidebar()
 
 
+def _render_legal_file_list(*, key_prefix: str, compact: bool = False) -> list[dict]:
+    """Show uploaded legal PDFs with per-file Remove buttons."""
+    docs = list_legal_documents()
+    if not docs:
+        return docs
+
+    st.markdown("**Uploaded legal PDFs**")
+    for index, doc in enumerate(docs):
+        cols = st.columns([5, 1] if compact else [6, 1])
+        label = f"{doc['filename']} ({doc['size_kb']} KB)"
+        with cols[0]:
+            if compact:
+                st.caption(label)
+            else:
+                st.text(f"{label} — updated {doc['modified_utc']}")
+        with cols[1]:
+            if st.button(
+                "Remove",
+                key=f"{key_prefix}_remove_{index}",
+                help=f"Delete {doc['filename']} from disk and the search index",
+            ):
+                removal, error = _process_legal_removal(doc["filename"])
+                if error:
+                    st.error(error)
+                elif removal is not None:
+                    stats = get_collection_stats()
+                    st.success(
+                        f"Removed `{removal.filename}` "
+                        f"({removal.chunks_removed} chunks deleted). "
+                        f"Collection now has {stats.get('count', 0)} chunks."
+                    )
+                    _reload_rag_session()
+                    st.rerun()
+    return docs
+
+
 def _render_legal_upload_sidebar() -> None:
     """Compact legal PDF uploader in the sidebar."""
     st.subheader("Legal documents")
     st.caption("Upload PDFs to `data/legal/` and index them for search.")
+
+    docs = _render_legal_file_list(key_prefix="legal_sidebar", compact=True)
+    if not docs:
+        st.caption("No legal PDFs uploaded yet.")
 
     uploads = st.file_uploader(
         "Upload PDF",
@@ -412,13 +468,12 @@ def _render_legal_documents_panel(*, expanded: bool = False) -> None:
     """Full legal document manager on the main page."""
     with st.expander("Manage legal documents", expanded=expanded):
         st.caption(
-            "Upload legal PDFs here. Files are saved under `data/legal/` and embedded into the search index."
+            "Upload legal PDFs here. Files are saved under `data/legal/` and embedded into the search index. "
+            "Use **Remove** to delete a PDF you no longer want in search results."
         )
 
-        docs = list_legal_documents()
-        if docs:
-            st.dataframe(docs, use_container_width=True, hide_index=True)
-        else:
+        docs = _render_legal_file_list(key_prefix="legal_main", compact=False)
+        if not docs:
             st.info("No legal PDFs uploaded yet.")
 
         uploads = st.file_uploader(

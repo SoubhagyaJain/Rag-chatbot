@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 from src.config import settings
-from src.indexing import IndexingResult, build_index, configure_llama_index
+from src.indexing import (
+    IndexingResult,
+    build_index,
+    configure_llama_index,
+    remove_document_from_index,
+)
 
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
 _PDF_MAGIC = b"%PDF"
@@ -42,6 +48,43 @@ def save_legal_pdf(content: bytes, filename: str) -> Path:
     dest = settings.legal_dir / safe_name
     dest.write_bytes(content)
     return dest
+
+
+@dataclass(frozen=True)
+class RemoveDocumentResult:
+    filename: str
+    file_deleted: bool
+    chunks_removed: int
+
+
+def _resolve_legal_pdf_path(filename: str) -> Path:
+    """Return a PDF path under data/legal/; reject path traversal."""
+    base = Path(filename).name
+    if not base or base != filename.strip() or base != filename:
+        raise ValueError("Invalid filename")
+    if not base.lower().endswith(".pdf"):
+        raise ValueError("Only PDF files can be removed")
+    path = (settings.legal_dir / base).resolve()
+    legal_root = settings.legal_dir.resolve()
+    if path.parent != legal_root:
+        raise ValueError("Invalid filename")
+    if not path.is_file():
+        raise FileNotFoundError(f"Legal PDF not found: {base}")
+    return path
+
+
+def remove_legal_document(filename: str) -> RemoveDocumentResult:
+    """Delete a legal PDF from disk and remove its chunks from Chroma."""
+    path = _resolve_legal_pdf_path(filename)
+    source_file = path.name
+    configure_llama_index()
+    chunks_removed = remove_document_from_index(source_file)
+    path.unlink()
+    return RemoveDocumentResult(
+        filename=source_file,
+        file_deleted=True,
+        chunks_removed=chunks_removed,
+    )
 
 
 def list_legal_documents() -> list[dict]:
