@@ -171,6 +171,8 @@ streamlit run app/streamlit_app.py
 
 Open [http://localhost:8501](http://localhost:8501).
 
+Upload legal PDFs from the **sidebar** or **Manage legal documents** panel on the main page — files are saved to `data/legal/` and indexed automatically.
+
 ### Docker (Streamlit + host Ollama)
 
 Ollama runs on your **host machine**; the app container connects via `host.docker.internal`.

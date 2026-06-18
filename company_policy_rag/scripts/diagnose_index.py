@@ -17,7 +17,7 @@ print("sqlite exists:", (settings.chroma_persist_dir / "chroma.sqlite3").exists(
 try:
     client = get_chroma_client()
     print("client ok")
-    collections = [c.name for c in client.list_collections()]
+    collections = [str(c) for c in client.list_collections()]
     print("collections:", collections)
     if settings.chroma_collection_name in collections:
         col = client.get_collection(settings.chroma_collection_name)

@@ -32,11 +32,16 @@ from llama_index.core.memory import ChatMemoryBuffer
 
 from src.agent import AgentTurnResult, chat_with_memory, create_agent, configure_llm
 from src.config import settings
+from src.document_upload import (
+    index_legal_paths,
+    list_legal_documents,
+    save_legal_pdf,
+)
 from src.indexing import (
+    IndexingResult,
     configure_llama_index,
     get_collection_stats,
     get_or_create_index,
-    index_exists,
     probe_chroma_index,
     reset_chroma_client_cache,
 )
@@ -164,6 +169,87 @@ def _run_agent_turn(
             loop.close()
 
 
+def _reload_rag_session() -> None:
+    """Force agent re-init after the Chroma index changes."""
+    reset_chroma_client_cache()
+    st.session_state.initialized = False
+    st.session_state.pop("agent", None)
+    st.session_state.pop("retriever", None)
+    st.session_state.pop("settings_fingerprint", None)
+
+
+def _format_indexing_result(result: IndexingResult) -> str:
+    lines = [
+        f"PDFs processed: {', '.join(result.pdf_files_processed) or 'none'}",
+        f"Chunks inserted: {result.nodes_inserted}",
+        f"Documents loaded: {result.documents_loaded}",
+    ]
+    if result.pdf_files_skipped:
+        lines.append(f"Skipped (unchanged): {', '.join(result.pdf_files_skipped)}")
+    if result.errors:
+        lines.append("Errors:")
+        lines.extend(f"  - {err}" for err in result.errors)
+    return "\n".join(lines)
+
+
+def _index_changed(result: IndexingResult | None) -> bool:
+    if result is None:
+        return False
+    return result.nodes_inserted > 0 or bool(result.pdf_files_processed)
+
+
+def _show_upload_outcome(result: IndexingResult | None, error: str | None, *, compact: bool = False) -> bool:
+    """
+    Display upload/index outcome. Returns True if the RAG session should reload.
+    """
+    if error:
+        st.error(error)
+        return False
+
+    if result is None:
+        return False
+
+    if _index_changed(result):
+        stats = get_collection_stats()
+        st.success(
+            f"Indexed successfully. Total chunks in collection: {stats.get('count', 0)}"
+        )
+        body = _format_indexing_result(result)
+        if compact:
+            st.caption(body)
+        else:
+            st.code(body, language="text")
+        return True
+
+    # Saved to disk but content already in Chroma (common when handbook exists in policies/).
+    st.info(
+        "File saved to `data/legal/`, but content is **already indexed** "
+        "(unchanged hash). Chat is ready — no re-index needed."
+    )
+    if compact:
+        st.caption(_format_indexing_result(result))
+    else:
+        st.code(_format_indexing_result(result), language="text")
+    return False
+
+
+def _process_legal_uploads(uploaded_files: list[Any]) -> tuple[list[Path], IndexingResult | None, str | None]:
+    """Save uploaded PDFs and run incremental indexing. Returns paths, result, error."""
+    if not uploaded_files:
+        return [], None, "Select at least one PDF to upload."
+
+    saved_paths: list[Path] = []
+    try:
+        for uploaded in uploaded_files:
+            saved_paths.append(save_legal_pdf(uploaded.getvalue(), uploaded.name))
+        with st.spinner("Indexing legal documents (embeddings via Ollama)…"):
+            result = index_legal_paths(saved_paths)
+        return saved_paths, result, None
+    except Exception as exc:
+        logger.exception("Legal document upload/index failed")
+        return saved_paths, None, str(exc)
+
+
 def _index_health() -> dict[str, Any]:
     """Chunk count plus approximate last-index time from Chroma persistence."""
     stats = get_collection_stats()
@@ -234,7 +320,8 @@ def _render_grounding_badge() -> None:
 # ── Sidebar ──────────────────────────────────────────────────────────────────
 
 
-def _render_sidebar() -> None:
+def _render_sidebar_controls() -> None:
+    """Settings widgets — render early so grounding/temperature apply before init."""
     with st.sidebar:
         st.title("Settings")
         st.caption("Internal policy & legal document assistant")
@@ -266,26 +353,86 @@ def _render_sidebar() -> None:
                 memory.reset()
             st.rerun()
 
+
+def _render_sidebar_status() -> None:
+    """System status + legal upload — render after backend init in main()."""
+    with st.sidebar:
         st.divider()
         st.subheader("System status")
-        if st.session_state.get("initialized"):
-            health = _index_health()
+        health = _index_health()
+        if health.get("ready"):
             st.metric("Indexed chunks", health.get("count", 0))
             if health.get("last_updated"):
                 st.caption(f"Index last updated: {health['last_updated']}")
             st.caption(f"Collection: `{health.get('collection', '—')}`")
-            st.caption(f"LLM: `{settings.llm_model}`")
-            st.caption(f"Embeddings: `{settings.embed_model}`")
-            if settings.enable_reranker:
-                st.caption(
-                    f"Retrieval: {settings.retrieval_candidate_k} candidates → "
-                    f"rerank → top {settings.reranker_top_n}"
-                )
-            mem = memory_stats(st.session_state.get("memory"))
-            if mem.get("enabled"):
-                st.caption(f"Memory: {mem.get('turns', 0)} turns in session")
+            if st.session_state.get("initialized"):
+                st.caption(f"LLM: `{settings.llm_model}`")
+                st.caption(f"Embeddings: `{settings.embed_model}`")
+                if settings.enable_reranker:
+                    st.caption(
+                        f"Retrieval: {settings.retrieval_candidate_k} candidates → "
+                        f"rerank → top {settings.reranker_top_n}"
+                    )
+                mem = memory_stats(st.session_state.get("memory"))
+                if mem.get("enabled"):
+                    st.caption(f"Memory: {mem.get('turns', 0)} turns in session")
+            else:
+                st.caption("Agent loading…")
         else:
-            st.warning("Index not loaded — see main panel.")
+            st.warning("No index yet — upload a legal PDF in the main panel.")
+
+        st.divider()
+        _render_legal_upload_sidebar()
+
+
+def _render_legal_upload_sidebar() -> None:
+    """Compact legal PDF uploader in the sidebar."""
+    st.subheader("Legal documents")
+    st.caption("Upload PDFs to `data/legal/` and index them for search.")
+
+    uploads = st.file_uploader(
+        "Upload PDF",
+        type=["pdf"],
+        accept_multiple_files=True,
+        key="legal_upload_sidebar",
+        label_visibility="collapsed",
+    )
+
+    if st.button("Save & index", key="legal_index_sidebar", use_container_width=True, disabled=not uploads):
+        _, result, error = _process_legal_uploads(uploads or [])
+        if _show_upload_outcome(result, error, compact=True):
+            _reload_rag_session()
+            st.rerun()
+
+
+# ── Legal documents panel ─────────────────────────────────────────────────────
+
+
+def _render_legal_documents_panel(*, expanded: bool = False) -> None:
+    """Full legal document manager on the main page."""
+    with st.expander("Manage legal documents", expanded=expanded):
+        st.caption(
+            "Upload legal PDFs here. Files are saved under `data/legal/` and embedded into the search index."
+        )
+
+        docs = list_legal_documents()
+        if docs:
+            st.dataframe(docs, use_container_width=True, hide_index=True)
+        else:
+            st.info("No legal PDFs uploaded yet.")
+
+        uploads = st.file_uploader(
+            "Upload legal PDF(s)",
+            type=["pdf"],
+            accept_multiple_files=True,
+            key="legal_upload_main",
+        )
+
+        if st.button("Save & index", key="legal_index_main", type="primary", disabled=not uploads):
+            _, result, error = _process_legal_uploads(uploads or [])
+            if _show_upload_outcome(result, error):
+                _reload_rag_session()
+                st.rerun()
 
 
 # ── Chat UI ──────────────────────────────────────────────────────────────────
@@ -316,7 +463,7 @@ def _render_welcome() -> None:
 
 def main() -> None:
     _ensure_session_state()
-    _render_sidebar()
+    _render_sidebar_controls()
 
     st.title("Company Policy Assistant")
     header_cols = st.columns([3, 1])
@@ -326,12 +473,15 @@ def main() -> None:
         _render_grounding_badge()
 
     probe = probe_chroma_index()
-    if not probe["ready"]:
-        st.error(
-            "**No document index found.** Place PDFs in `data/policies/` or `data/legal/`, "
-            "then run:\n\n```bash\npython scripts/index_documents.py\n```"
+    index_ready = probe["ready"]
+
+    if not index_ready:
+        st.warning(
+            "**No searchable index yet.** Upload a legal PDF below to create one, "
+            "or place handbook PDFs in `data/policies/` and run indexing."
         )
-        with st.expander("Index diagnostics", expanded=True):
+        _render_legal_documents_panel(expanded=True)
+        with st.expander("Index diagnostics & CLI fallback", expanded=False):
             st.code(
                 "\n".join(
                     [
@@ -347,14 +497,17 @@ def main() -> None:
                 ),
                 language="text",
             )
-            if st.button("Clear Chroma client cache and retry", type="primary"):
+            st.markdown(
+                "Handbook / bulk indexing:\n\n```bash\npython scripts/index_documents.py\n```"
+            )
+            if st.button("Clear Chroma client cache and retry", key="retry_chroma_cache"):
                 reset_chroma_client_cache()
                 st.rerun()
-            st.caption(
-                "Chunks (actual) is read directly from Chroma. If it shows 81+ but the app "
-                "still fails, click retry above or fully restart Streamlit."
-            )
-        return
+        probe = probe_chroma_index()
+        index_ready = probe["ready"]
+        if not index_ready:
+            _render_sidebar_status()
+            return
 
     fingerprint = _settings_fingerprint()
     needs_init = (
@@ -364,8 +517,9 @@ def main() -> None:
 
     if needs_init:
         try:
-            preserved_memory = st.session_state.get("memory")
-            agent, retriever, memory, _index = _initialize_backend(memory=preserved_memory)
+            with st.spinner("Loading policy assistant (index + agent)…"):
+                preserved_memory = st.session_state.get("memory")
+                agent, retriever, memory, _index = _initialize_backend(memory=preserved_memory)
             st.session_state.agent = agent
             st.session_state.retriever = retriever
             st.session_state.memory = memory
@@ -375,7 +529,10 @@ def main() -> None:
         except Exception as exc:
             logger.exception("Streamlit backend initialization failed")
             st.error(f"Failed to initialize RAG backend: {exc}")
+            _render_sidebar_status()
             return
+
+    _render_sidebar_status()
 
     agent: ReActAgent | None = st.session_state.get("agent")
     retriever = st.session_state.get("retriever")
@@ -383,6 +540,9 @@ def main() -> None:
 
     _render_welcome()
     _render_chat_history()
+
+    # Legal upload below chat history; chat_input must stay last for sticky footer.
+    _render_legal_documents_panel(expanded=False)
 
     if prompt := st.chat_input("Ask a policy question…"):
         st.session_state.messages.append({"role": "user", "content": prompt})

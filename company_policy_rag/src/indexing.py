@@ -222,7 +222,8 @@ def probe_chroma_index(*, clear_cache: bool = False) -> dict[str, Any]:
 
     try:
         client = get_chroma_client()
-        result["collections"] = [c.name for c in client.list_collections()]
+        # Chroma 0.6+ list_collections() returns CollectionName objects; str() is portable.
+        result["collections"] = [str(c) for c in client.list_collections()]
         if settings.chroma_collection_name not in result["collections"]:
             result["error"] = (
                 f"Collection {settings.chroma_collection_name!r} not found. "

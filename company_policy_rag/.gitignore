@@ -45,6 +45,6 @@ Thumbs.db
 .chainlit/
 .files/
 
-# Optional: keep PDFs local only (uncomment if sensitive)
-# data/policies/*.pdf
-# data/legal/*.pdf
+# User uploads in legal/ — keep local (sample handbook lives in policies/)
+data/legal/*.pdf
+!data/legal/.gitkeep
