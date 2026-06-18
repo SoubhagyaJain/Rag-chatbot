@@ -208,17 +208,29 @@ docker compose down
 
 Set `AUTO_INDEX_ON_START=true` in `.env.docker` to index automatically when Chroma is empty.
 
-### Install from GitHub Packages (Container registry)
+### Install pre-built Docker image (Docker Hub)
 
-Pre-built image: `ghcr.io/soubhagyajain/rag-chatbot`
+Pre-built image: `soubhagyajain/rag-chatbot`
 
 ```bash
-docker pull ghcr.io/soubhagyajain/rag-chatbot:latest
+docker pull soubhagyajain/rag-chatbot:latest
 cp .env.docker.example .env.docker
-docker compose -f docker-compose.ghcr.yml up -d
+docker compose -f docker-compose.dockerhub.yml up -d
 ```
 
-Images are published automatically on pushes to `main` and version tags (`v*`).
+Images are published automatically on pushes to `main` and version tags (`v*`) via GitHub Actions → Docker Hub.
+
+**Manual publish** (if CI is unavailable):
+
+```bash
+docker login
+docker build -t soubhagyajain/rag-chatbot:latest .
+docker push soubhagyajain/rag-chatbot:latest
+```
+
+**GitHub Packages (ghcr.io):** disabled on account `SoubhagyaJain` — contact [GitHub Support](https://support.github.com/request) to re-enable. The `docker-compose.ghcr.yml` file is kept for when access is restored.
+
+**CI setup:** add repo secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (Docker Hub → Account Settings → Security → Access Tokens).
 
 ### Install from PyPI
 

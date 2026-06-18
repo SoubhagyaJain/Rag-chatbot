@@ -47,15 +47,17 @@ cp .env.docker.example .env.docker
 docker compose up --build
 ```
 
-Docker (pull from GitHub Packages / ghcr.io):
+Docker (pull pre-built image from Docker Hub):
 
 ```bash
 git clone https://github.com/SoubhagyaJain/Rag-chatbot.git
 cd Rag-chatbot/company_policy_rag
 cp .env.docker.example .env.docker
-docker pull ghcr.io/soubhagyajain/rag-chatbot:latest
-docker compose -f docker-compose.ghcr.yml up -d
+docker pull soubhagyajain/rag-chatbot:latest
+docker compose -f docker-compose.dockerhub.yml up -d
 ```
+
+> **Note:** GitHub Packages (ghcr.io) is disabled on this account until GitHub Support re-enables it. Use Docker Hub above, or build locally with `docker compose up --build`.
 
 PyPI (library + CLI — run from project directory with `data/`, `.env`):
 
