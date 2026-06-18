@@ -228,9 +228,7 @@ docker build -t soubhagyajain/rag-chatbot:latest .
 docker push soubhagyajain/rag-chatbot:latest
 ```
 
-**GitHub Packages (ghcr.io):** disabled on account `SoubhagyaJain` — contact [GitHub Support](https://support.github.com/request) to re-enable. The `docker-compose.ghcr.yml` file is kept for when access is restored.
-
-**CI setup:** add repo secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (Docker Hub → Account Settings → Security → Access Tokens).
+**CI setup (Docker Hub only):** add repo secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (Docker Hub → Account Settings → Security → Access Tokens).
 
 ### Install from PyPI
 

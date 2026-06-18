@@ -57,8 +57,6 @@ docker pull soubhagyajain/rag-chatbot:latest
 docker compose -f docker-compose.dockerhub.yml up -d
 ```
 
-> **Note:** GitHub Packages (ghcr.io) is disabled on this account until GitHub Support re-enables it. Use Docker Hub above, or build locally with `docker compose up --build`.
-
 PyPI (library + CLI — run from project directory with `data/`, `.env`):
 
 ```bash
