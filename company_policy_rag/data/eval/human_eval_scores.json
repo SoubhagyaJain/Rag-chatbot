@@ -1,0 +1,38 @@
+{
+  "rater_id": "author",
+  "rater_role": "solo project author — self-rating against run 104356 outputs",
+  "run_id": "20260617_104356",
+  "scored_at": "2026-06-18",
+  "cases": [
+    {
+      "id": "sick_leave",
+      "faithfulness": 0.65,
+      "answer_relevancy": 0.85,
+      "notes": "Grounded on accrual rules but mixes 3-day calendar grant with hourly accrual cap without clear sourcing."
+    },
+    {
+      "id": "notice_resignation",
+      "faithfulness": 0.85,
+      "answer_relevancy": 0.9,
+      "notes": "Correct at-will framing with [Source N]; minor unsupported claim that no penalties are described."
+    },
+    {
+      "id": "remote_work",
+      "faithfulness": 1.0,
+      "answer_relevancy": 0.5,
+      "notes": "Honest abstention — faithful but employee still needs HR escalation; partial relevancy."
+    },
+    {
+      "id": "harassment_rules",
+      "faithfulness": 0.75,
+      "answer_relevancy": 0.85,
+      "notes": "Strong definition and reporting; discipline ladder wording not in sources."
+    },
+    {
+      "id": "outside_employment",
+      "faithfulness": 1.0,
+      "answer_relevancy": 0.65,
+      "notes": "Correct insufficient-info response; missed implied conflict-of-interest hooks in ethics sections."
+    }
+  ]
+}

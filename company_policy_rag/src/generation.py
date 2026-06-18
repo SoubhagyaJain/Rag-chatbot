@@ -31,7 +31,8 @@ from src.prompts import (
 )
 from src.citations import log_retrieval_stage, record_generation_sources
 from src.retriever import build_retriever
-from src.utils import logger
+from src.timing import get_current_timing, record_stage
+from src.utils import logger, timer
 
 # Substrings that signal a trailing abstention block (full or partial phrasing).
 _ABSTENTION_MARKERS: tuple[str, ...] = (
@@ -284,7 +285,10 @@ def apply_faithfulness_guard(
     )
 
     try:
-        verdict_raw = str(judge.complete(prompt)).strip()
+        with timer("faithfulness_guard") as t_guard:
+            verdict_raw = str(judge.complete(prompt)).strip()
+        if get_current_timing() is not None:
+            record_stage("faithfulness_guard", t_guard["elapsed_ms"])
         passed = _parse_guard_verdict(verdict_raw, guard_mode)
         if passed:
             logger.debug("Faithfulness guard (%s): passed", guard_mode)
@@ -320,7 +324,10 @@ def generate_grounded_answer_with_trace(
 
     synth = build_grounded_response_synthesizer(llm)
     text_chunks = _format_text_chunks(nodes)
-    pre_guard = synth.get_response(query_str=query, text_chunks=text_chunks)
+    with timer("generation") as t_gen:
+        pre_guard = synth.get_response(query_str=query, text_chunks=text_chunks)
+    if get_current_timing() is not None:
+        record_stage("generation", t_gen["elapsed_ms"])
     normalized = normalize_balanced_answer(pre_guard)
     final = apply_faithfulness_guard(normalized, nodes, llm or synth._llm)
     return pre_guard, final

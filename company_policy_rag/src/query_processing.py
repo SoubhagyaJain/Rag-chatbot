@@ -11,7 +11,8 @@ from __future__ import annotations
 from llama_index.core import Settings
 
 from src.config import settings
-from src.utils import logger
+from src.timing import get_current_timing, record_stage
+from src.utils import logger, timer
 
 # Deterministic term expansion before LLM rewrite — improves recall for edge cases
 # where embedding similarity misses handbook vocabulary (at-will, health insurance).
@@ -112,7 +113,10 @@ def rewrite_query_for_retrieval(query: str) -> str:
     )
 
     try:
-        response = str(llm.complete(prompt)).strip()
+        with timer("query_rewrite") as t:
+            response = str(llm.complete(prompt)).strip()
+        if get_current_timing() is not None:
+            record_stage("query_rewrite", t["elapsed_ms"])
         # Take first line only — models sometimes add chatter
         rewritten = response.splitlines()[0].strip().strip('"').strip("'")
         if len(rewritten) < 5:

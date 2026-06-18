@@ -276,17 +276,20 @@ Golden cases: `data/eval/golden_dataset.json`. Add questions from your handbook;
 
 ## Production considerations
 
-### Latency budget (typical, CPU)
+### Latency budget (measured, CPU)
 
-| Stage | Approx. cost |
-|-------|----------------|
-| Query rewrite | 200–800 ms |
-| Embedding + Chroma | 50–200 ms |
-| Reranker (large, 25→5) | 200–600 ms |
-| Generation | 1–5 s |
-| Faithfulness guard | 200–800 ms |
+Measured 2026-06-18 with `scripts/benchmark_latency.py` on 5 golden-set cases (`logs/latency_benchmark.json`, qwen2.5:7b, bge-reranker-large, k=30→rerank top 6):
 
-Use `bge-reranker-base` or `FAITHFULNESS_GUARD_MODE=off` for latency-sensitive paths. GPU reranking cuts rerank time significantly.
+| Stage | p50 | p95 |
+|-------|-----|-----|
+| Query rewrite | 1.1 s | 1.3 s |
+| Embedding + Chroma | 49 ms | 75 ms |
+| Reranker + score filter | 28.5 s | 29.7 s |
+| Generation | 20.2 s | 25.5 s |
+| Faithfulness guard | 859 ms | 1.1 s |
+| **End-to-end** | **53.5 s** | **58.8 s** |
+
+Reranker dominates on CPU (~58% of e2e). Use `bge-reranker-base`, `FAITHFULNESS_GUARD_MODE=off`, or GPU reranking for latency-sensitive paths. First query after process start adds ~10 s reranker cold load (not in table above).
 
 ### When to enable the reranker
 

@@ -23,6 +23,9 @@ storage/*
 # Logs
 logs/*
 !logs/.gitkeep
+!logs/evaluation_results.json
+!logs/latency_benchmark.json
+!logs/human_judge_agreement.json
 app/logs/
 
 # Jupyter

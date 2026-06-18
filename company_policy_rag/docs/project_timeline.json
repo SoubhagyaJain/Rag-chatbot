@@ -1,0 +1,31 @@
+{
+  "source": "git log -- company_policy_rag/ + logs/evaluation_results.json",
+  "git": {
+    "first_commit": "2026-06-17T17:48:05+05:30",
+    "last_commit": "2026-06-17T17:48:05+05:30",
+    "commit_count": 1,
+    "calendar_days": 1,
+    "calendar_weeks": 0.5,
+    "note": "Single initial commit in git; intensive same-day build with 13 eval runs."
+  },
+  "eval_sprint": {
+    "date": "2026-06-17",
+    "first_run_utc": "2026-06-17T05:22:33Z",
+    "last_run_utc": "2026-06-17T10:43:56Z",
+    "duration_hours": 5.4,
+    "run_count": 13,
+    "best_balanced_run": "20260617_104356"
+  },
+  "phases": [
+    {"act": 1, "name": "Baseline & reranker", "focus": "Indexing, Chroma, reranker, first eval"},
+    {"act": 2, "name": "Strict grounding experiment", "focus": "Faith 1.00 / relv 0.42 Pareto discovery"},
+    {"act": 3, "name": "Regression 091001", "focus": "Relv 0.40 root-cause"},
+    {"act": 4, "name": "Relevancy recovery", "focus": "Phases 1-4 to run 104356"},
+    {"act": 5, "name": "Streamlit UI + agent migration", "focus": "LlamaIndex 0.14"},
+    {"act": 6, "name": "Citation trust fix", "focus": "SourceTracking + UI"},
+    {"act": 7, "name": "Mandatory [Source N]", "focus": "prompts.py"},
+    {"act": 8, "name": "Chroma health", "focus": "probe + telemetry"},
+    {"act": 9, "name": "Docker deployment", "focus": "Compose + host Ollama"}
+  ],
+  "interview_framing": "Git shows one commit on 2026-06-17; the project was built as an intensive solo sprint with 13 logged eval iterations over ~5.4 hours the same UTC day. Say ~0.5 calendar weeks in git span, with most engineering time in eval-driven iteration—not a months-long waterfall."
+}

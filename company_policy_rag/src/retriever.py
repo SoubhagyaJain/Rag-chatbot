@@ -25,6 +25,8 @@ from src.config import settings
 from src.indexing import load_index
 from src.postprocessors import RelativeScoreThresholdPostprocessor
 from src.query_processing import rewrite_query_for_retrieval
+from src.timing import get_current_timing, record_stage
+from src.utils import timer
 from src.utils import logger
 
 # Lazy-loaded singleton — cross-encoder load is ~1–3 s; avoid reloading per query
@@ -297,9 +299,15 @@ class _PostprocessingRetriever:
 
     def retrieve(self, query: str | QueryBundle) -> list[NodeWithScore]:
         bundle = _to_query_bundle(query)
-        nodes = self._inner.retrieve(bundle)
+        with timer("chroma_retrieve") as t_chroma:
+            nodes = self._inner.retrieve(bundle)
+        if get_current_timing() is not None:
+            record_stage("chroma_retrieve", t_chroma["elapsed_ms"])
         log_retrieval_stage("chroma_retrieved", nodes)
-        filtered = apply_postprocessors(nodes, bundle, self._postprocessors)
+        with timer("rerank_filter") as t_rerank:
+            filtered = apply_postprocessors(nodes, bundle, self._postprocessors)
+        if get_current_timing() is not None:
+            record_stage("rerank_filter", t_rerank["elapsed_ms"])
         log_retrieval_stage("post_rerank_filter", filtered)
         return filtered
 
