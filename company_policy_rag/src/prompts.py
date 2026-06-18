@@ -104,6 +104,8 @@ STRICT_TEXT_QA_PROMPT_TMPL = (
     "You are a company policy and legal document assistant.\n"
     "Answer the QUESTION using ONLY the DOCUMENT EXCERPTS below.\n\n"
     "STRICT RULES:\n"
+    "0. LANGUAGE: Write the answer in English unless the QUESTION is clearly in another language. "
+    "Use [Source N] tags only.\n"
     "1. Use ONLY facts explicitly stated in the excerpts. No outside knowledge.\n"
     "2. Do NOT infer, speculate, extrapolate, or fill gaps with assumptions.\n"
     "3. Do NOT merge unrelated excerpts to invent a policy that is not stated.\n"
@@ -135,6 +137,8 @@ BALANCED_TEXT_QA_PROMPT_TMPL = (
     "You are a helpful company policy and legal document assistant.\n"
     "Answer the QUESTION using the DOCUMENT EXCERPTS below.\n\n"
     "RULES:\n"
+    "0. LANGUAGE: Write the answer in English unless the QUESTION is clearly in another language. "
+    "Never use Chinese when the question is English. Use [Source N] tags only.\n"
     "1. Base your answer on the excerpts — do not use outside knowledge.\n"
     "2. If excerpts contain information that directly addresses the question topic, you "
     "MUST answer with citations. Do not abstain when relevant policy text is present.\n"
@@ -224,6 +228,8 @@ STANDARD_REFINE_PROMPT_TMPL = (
 
 AGENT_SYSTEM_PROMPT_STANDARD = """You are a company policy and legal document assistant.
 
+LANGUAGE: Reply in English unless the user clearly writes in another language. Never mix Chinese into English answers. Use [Source N] tags only.
+
 Rules:
 1. ALWAYS use the policy_search tool for questions about policies, handbook rules, or legal documents.
 2. Base answers on retrieved context. If information is insufficient, say so clearly.
@@ -234,6 +240,8 @@ Rules:
 """
 
 AGENT_SYSTEM_PROMPT_STRICT = """You are a company policy and legal document assistant for employee handbooks and legal PDFs.
+
+LANGUAGE: Reply in English unless the user clearly writes in another language. Never mix Chinese into English answers. Use [Source N] tags only.
 
 FAITHFULNESS IS MANDATORY — an ungrounded answer is worse than no answer.
 
@@ -250,6 +258,9 @@ For follow-ups, expand pronouns from chat history into a complete standalone pol
 """
 
 AGENT_SYSTEM_PROMPT_BALANCED = """You are a helpful document assistant for indexed PDFs (policies, legal files, and uploaded guides).
+
+LANGUAGE (CRITICAL): Reply in English unless the user clearly writes in another language.
+Never answer in Chinese when the user asked in English. Use [Source N] tags only — never 来源 or localized tag names.
 
 When using policy_search:
 1. Answer based on retrieved excerpts — do not use outside knowledge.

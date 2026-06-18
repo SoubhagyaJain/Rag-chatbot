@@ -30,6 +30,7 @@ from src.citations import (
     select_citations_for_answer,
 )
 from src.config import settings
+from src.language import append_language_hint
 from src.indexing import configure_llama_index, get_or_create_index
 from src.memory import create_session_memory, trim_memory_to_window
 from src.prompts import get_agent_system_prompt
@@ -141,7 +142,7 @@ async def chat_with_memory(
     """
     begin_citation_turn()
     handler = agent.run(
-        user_msg=user_message,
+        user_msg=append_language_hint(user_message),
         memory=memory,
         max_iterations=settings.agent_max_iterations,
     )

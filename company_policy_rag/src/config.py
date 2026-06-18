@@ -205,6 +205,12 @@ class Settings(BaseSettings):
     )
     comprehensive_max_subqueries: int = Field(default=8, alias="COMPREHENSIVE_MAX_SUBQUERIES")
 
+    # ── Response language ──────────────────────────────────────────────────
+    # english = always English (recommended for qwen2.5); match_query = follow user language
+    response_language: Literal["english", "chinese", "match_query"] = Field(
+        default="english", alias="RESPONSE_LANGUAGE"
+    )
+
     # ── Document taxonomy ──────────────────────────────────────────────────
     # Maps top-level data subfolders → metadata document_type values
     folder_document_types: dict[str, str] = Field(

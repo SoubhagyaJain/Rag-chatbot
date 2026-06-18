@@ -19,6 +19,7 @@ from llama_index.core.response_synthesizers.base import QueryTextType
 from llama_index.core.schema import NodeWithScore, QueryBundle
 
 from src.config import settings
+from src.language import append_language_hint
 from src.prompts import (
     INSUFFICIENT_INFO_MESSAGE,
     PARTIAL_ANSWER_MIN_CHARS,
@@ -68,8 +69,9 @@ class GroundedCompactAndRefine(CompactAndRefine):
             query = QueryBundle(query_str=query)
 
         text_chunks = _format_text_chunks(nodes)
+        query_str = append_language_hint(query.query_str)
         response_str = self.get_response(
-            query_str=query.query_str,
+            query_str=query_str,
             text_chunks=text_chunks,
             **response_kwargs,
         )
@@ -93,8 +95,9 @@ class GroundedCompactAndRefine(CompactAndRefine):
             query = QueryBundle(query_str=query)
 
         text_chunks = _format_text_chunks(nodes)
+        query_str = append_language_hint(query.query_str)
         response_str = await self.aget_response(
-            query_str=query.query_str,
+            query_str=query_str,
             text_chunks=text_chunks,
             **response_kwargs,
         )
