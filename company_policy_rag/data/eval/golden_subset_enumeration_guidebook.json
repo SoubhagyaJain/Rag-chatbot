@@ -1,0 +1,107 @@
+{
+  "version": "1.0",
+  "corpus": "guidebook",
+  "source_document": "data/legal/AI_Agents_guidebook.pdf",
+  "description": "Enumeration-only subset for tuning validation",
+  "case_count": 5,
+  "query_type_counts": {
+    "enumeration": 5,
+    "code": 4,
+    "factual": 1
+  },
+  "cases": [
+    {
+      "id": "six_building_blocks",
+      "corpus": "guidebook",
+      "query_type": "enumeration",
+      "category": "enumeration",
+      "question": "List and explain the 6 building blocks of AI Agents.",
+      "expected_answer": "Should list all six blocks from the guidebook.",
+      "relevant_sections": [
+        "building blocks",
+        "Role",
+        "Tools",
+        "Memory",
+        "Guardrails",
+        "Planning"
+      ],
+      "expected_key_points": [
+        "building",
+        "block",
+        "tools",
+        "memory"
+      ],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "design_patterns_popular",
+      "corpus": "guidebook",
+      "query_type": "enumeration",
+      "category": "enumeration",
+      "question": "What are the most popular agent design patterns mentioned?",
+      "expected_answer": "Should list design patterns like ReAct.",
+      "relevant_sections": [
+        "design patterns",
+        "ReAct",
+        "popular"
+      ],
+      "expected_key_points": [
+        "pattern",
+        "ReAct"
+      ],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "memory_short_long",
+      "corpus": "guidebook",
+      "query_type": "enumeration",
+      "category": "enumeration",
+      "question": "What types of memory do agents use?",
+      "expected_answer": "Should describe memory categories.",
+      "relevant_sections": [
+        "Memory",
+        "short",
+        "long"
+      ],
+      "expected_key_points": [
+        "memory"
+      ],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "enumeration_subagents",
+      "corpus": "guidebook",
+      "query_type": "enumeration",
+      "category": "enumeration",
+      "question": "What roles can sub-agents play in orchestration?",
+      "expected_answer": "Should describe sub-agent specialization.",
+      "relevant_sections": [
+        "sub-agent",
+        "manager",
+        "specialist"
+      ],
+      "expected_key_points": [
+        "sub-agent"
+      ],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "agent_building_blocks_count",
+      "corpus": "guidebook",
+      "query_type": "enumeration",
+      "category": "enumeration",
+      "question": "How many building blocks of AI agents does the guidebook describe?",
+      "expected_answer": "Should state six building blocks.",
+      "relevant_sections": [
+        "6",
+        "six",
+        "building blocks"
+      ],
+      "expected_key_points": [
+        "six",
+        "6"
+      ],
+      "source_file": "AI_Agents_guidebook.pdf"
+    }
+  ]
+}

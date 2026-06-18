@@ -93,3 +93,12 @@ def test_resolve_reranker_device_explicit_cpu() -> None:
 def test_resolve_reranker_device_auto_returns_cpu_or_cuda() -> None:
     device = _resolve_reranker_device("auto")
     assert device in ("cpu", "cuda")
+
+
+def test_retrieval_config_includes_phase2_flags() -> None:
+    from src.retriever import get_retrieval_config_summary
+
+    summary = get_retrieval_config_summary()
+    assert "enable_hybrid_bm25" in summary
+    assert "enable_parent_document_retrieval" in summary
+    assert summary["enable_hybrid_bm25"] is True

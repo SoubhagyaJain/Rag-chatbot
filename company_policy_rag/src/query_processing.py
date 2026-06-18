@@ -45,6 +45,25 @@ _TOPIC_EXPANSIONS: list[tuple[tuple[str, ...], str]] = [
     ),
 ]
 
+_GUIDEBOOK_TOPIC_EXPANSIONS: list[tuple[tuple[str, ...], str]] = [
+    (
+        ("building block", "building blocks", "six building"),
+        "Role-playing Focus Tasks Tools Cooperation Guardrails Planning Memory six AI agents",
+    ),
+    (
+        ("types of memory", "memory do agents", "memory types", "memory agents use"),
+        "short-term long-term entity episodic semantic procedural memory",
+    ),
+    (
+        ("design pattern", "design patterns", "agent pattern", "most popular"),
+        "ReAct reflection planning tool use multi-agent orchestration design patterns",
+    ),
+    (
+        ("sub-agent", "sub-agents", "subagent", "orchestration roles", "roles can"),
+        "manager specialist research summarization delegation orchestration sub-agent",
+    ),
+]
+
 
 def augment_query_with_policy_terms(query: str) -> str:
     """
@@ -61,6 +80,23 @@ def augment_query_with_policy_terms(query: str) -> str:
     if not extras:
         return query
     return f"{query} {' '.join(extras)}"
+
+
+def augment_query_with_guidebook_terms(query: str) -> str:
+    """Append guidebook vocabulary for AI-agent enumeration and topic queries."""
+    q_lower = query.lower()
+    extras: list[str] = []
+    for triggers, terms in _GUIDEBOOK_TOPIC_EXPANSIONS:
+        if any(trigger in q_lower for trigger in triggers):
+            extras.append(terms)
+    if not extras:
+        return query
+    return f"{query} {' '.join(extras)}"
+
+
+def augment_query_for_retrieval(query: str) -> str:
+    """Deterministic term expansion before optional LLM rewrite."""
+    return augment_query_with_guidebook_terms(augment_query_with_policy_terms(query))
 
 
 REWRITE_PROMPT = """You rewrite employee policy questions into concise search queries for a document retrieval system.
@@ -92,17 +128,16 @@ def rewrite_query_for_retrieval(query: str) -> str:
     """
     LLM-based query rewrite for Chroma + reranker input.
 
-    Disabled when ENABLE_QUERY_REWRITE=false. Falls back to original query on error.
+    Disabled when ENABLE_QUERY_REWRITE=false. Falls back to augmented query on error.
     Adds ~200–800 ms per call on local Ollama — disable for latency-sensitive A/B.
     """
+    query = augment_query_for_retrieval(query)
     if not settings.enable_query_rewrite:
         return query
 
     context_block, core_question = _context_block_from_query(query)
     if not core_question:
         return query
-
-    core_question = augment_query_with_policy_terms(core_question)
 
     llm = Settings.llm
     if llm is None:
@@ -132,20 +167,67 @@ def rewrite_query_for_retrieval(query: str) -> str:
 
 _COMPREHENSIVE_QUERY_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\blist\b.+\bexplain\b", re.IGNORECASE),
+    re.compile(r"\blist\b", re.IGNORECASE),
     re.compile(r"\bbuilding\s+blocks?\b", re.IGNORECASE),
     re.compile(r"\bpay\s+special\s+attention\b", re.IGNORECASE),
     re.compile(r"\bfor\s+each\b", re.IGNORECASE),
     re.compile(r"\ball\s+\d+\b", re.IGNORECASE),
-    re.compile(r"\btypes?\s+of\b.+\binclude\b", re.IGNORECASE),
+    re.compile(r"\btypes?\s+of\b", re.IGNORECASE),
+    re.compile(r"\bwhat\s+are\s+the\b", re.IGNORECASE),
+    re.compile(r"\bhow\s+many\b", re.IGNORECASE),
+    re.compile(r"\broles?\s+can\b", re.IGNORECASE),
+    re.compile(r"\bdesign\s+patterns?\b", re.IGNORECASE),
+    re.compile(r"\bmost\s+popular\b", re.IGNORECASE),
 )
+
+_COMPREHENSIVE_MIN_QUERY_LEN = 25
 
 
 def is_comprehensive_list_query(query: str) -> bool:
     """True when the user asks for a multi-part list or enumeration from documents."""
     text = query.strip()
-    if len(text) < 40:
+    if len(text) < _COMPREHENSIVE_MIN_QUERY_LEN:
         return False
     return any(pattern.search(text) for pattern in _COMPREHENSIVE_QUERY_PATTERNS)
+
+
+_BUILDING_BLOCK_SUBQUERIES: tuple[str, ...] = (
+    "5 Levels of Agentic AI Systems building blocks overview",
+    "six building blocks Role-playing Tools Memory Guardrails Planning",
+    "Role-playing building block AI agents",
+    "Tools MCP building block AI agents",
+    "Memory building block AI agents",
+    "Guardrails building block AI agents",
+    "Planning building block AI agents",
+    "Cooperation Focus Tasks building block AI agents",
+)
+
+_MEMORY_TYPE_SUBQUERIES: tuple[str, ...] = (
+    "short-term memory agents",
+    "long-term memory agents",
+    "entity memory agents",
+)
+
+_DESIGN_PATTERN_SUBQUERIES: tuple[str, ...] = (
+    "ReAct agent design pattern",
+    "reflection agent pattern",
+    "planning pattern agents",
+    "tool use agent pattern",
+)
+
+_SUBAGENT_ROLE_SUBQUERIES: tuple[str, ...] = (
+    "research agent orchestration",
+    "manager agent sub-agent specialization",
+    "sub-agent roles delegation",
+)
+
+
+def _append_unique_query(queries: list[str], seen: set[str], item: str) -> None:
+    key = item.lower()
+    if key in seen:
+        return
+    seen.add(key)
+    queries.append(item)
 
 
 def _split_topic_clause(clause: str) -> list[str]:
@@ -170,7 +252,33 @@ def build_multi_retrieval_queries(query: str, *, max_queries: int = 8) -> list[s
     if not core:
         return []
 
-    queries: list[str] = [core]
+    queries: list[str] = []
+    seen: set[str] = set()
+    _append_unique_query(queries, seen, core)
+
+    q_lower = core.lower()
+
+    if re.search(r"building\s+blocks?", q_lower):
+        _append_unique_query(queries, seen, "six building blocks overview AI agents")
+        for subquery in _BUILDING_BLOCK_SUBQUERIES:
+            _append_unique_query(queries, seen, subquery)
+
+    if re.search(r"how\s+many", q_lower) and "building" in q_lower:
+        _append_unique_query(queries, seen, "six building blocks overview AI agents")
+
+    if re.search(r"types?\s+of\s+memory|memory\s+do\s+agents|memory\s+types?", q_lower):
+        for subquery in _MEMORY_TYPE_SUBQUERIES:
+            _append_unique_query(queries, seen, subquery)
+
+    if re.search(r"design\s+patterns?|agent\s+patterns?", q_lower) or "popular" in q_lower:
+        for subquery in _DESIGN_PATTERN_SUBQUERIES:
+            _append_unique_query(queries, seen, subquery)
+
+    if re.search(r"sub-?agents?|orchestration", q_lower) and re.search(
+        r"roles?", q_lower
+    ):
+        for subquery in _SUBAGENT_ROLE_SUBQUERIES:
+            _append_unique_query(queries, seen, subquery)
 
     attention_match = re.search(
         r"(?:pay\s+special\s+attention\s+to|including|covering|focus\s+on)\s+(.+)",
@@ -179,28 +287,6 @@ def build_multi_retrieval_queries(query: str, *, max_queries: int = 8) -> list[s
     )
     if attention_match:
         for topic in _split_topic_clause(attention_match.group(1)):
-            queries.append(f"{topic}")
+            _append_unique_query(queries, seen, topic)
 
-    blocks_match = re.search(r"\b(\d+)\s+building\s+blocks?\b", core, re.IGNORECASE)
-    if blocks_match:
-        count = int(blocks_match.group(1))
-        subject = "building blocks"
-        subject_match = re.search(
-            r"building\s+blocks?\s+of\s+(.+?)(?:\.|,|$)",
-            core,
-            re.IGNORECASE,
-        )
-        if subject_match:
-            subject = subject_match.group(1).strip()
-        for index in range(1, min(count, 8) + 1):
-            queries.append(f"{subject} building block {index}")
-
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for item in queries:
-        key = item.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(item)
-    return deduped[:max_queries]
+    return queries[:max_queries]

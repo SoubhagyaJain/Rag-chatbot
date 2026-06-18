@@ -80,12 +80,27 @@ class Settings(BaseSettings):
     llm_request_timeout: float = Field(default=120.0, alias="LLM_REQUEST_TIMEOUT")
     llm_context_window: int = Field(default=8192, alias="LLM_CONTEXT_WINDOW")
 
+    # ── PDF parsing ────────────────────────────────────────────────────────
+    # Marker improves layout/code extraction on technical PDFs; PDFReader fallback always available.
+    enable_marker_pdf: bool = Field(default=False, alias="ENABLE_MARKER_PDF")
+    pdf_parser: Literal["auto", "marker", "pypdf"] = Field(default="auto", alias="PDF_PARSER")
+    marker_device: str = Field(default="auto", alias="MARKER_DEVICE")
+
     # ── Chunking (tokens) ──────────────────────────────────────────────────
-    # 512–768 recommended for policy/legal: keeps clauses together while
-    # staying within embedder sweet spot. 640 is our default compromise.
-    # Overlap 64 (was 80) reduces near-duplicate chunks that hurt Context Precision.
-    chunk_size: int = Field(default=640, alias="CHUNK_SIZE")
+    # Hierarchical: parents in docstore (wide context), children embedded in Chroma (precision).
+    enable_hierarchical_chunking: bool = Field(
+        default=True, alias="ENABLE_HIERARCHICAL_CHUNKING"
+    )
+    parent_chunk_size: int = Field(default=2000, alias="PARENT_CHUNK_SIZE")
+    # Child size smaller than legacy 640 — better code/diagram retrieval precision.
+    chunk_size: int = Field(default=480, alias="CHUNK_SIZE")
     chunk_overlap: int = Field(default=64, alias="CHUNK_OVERLAP")
+    docstore_dir: Path = Field(default=PROJECT_ROOT / "storage" / "docstore")
+
+    # ── Diagram captions (indexed as embeddable nodes) ─────────────────────
+    enable_diagram_captions: bool = Field(default=True, alias="ENABLE_DIAGRAM_CAPTIONS")
+    enable_caption_llm: bool = Field(default=False, alias="ENABLE_CAPTION_LLM")
+    caption_model: str = Field(default="qwen2.5:7b", alias="CAPTION_MODEL")
 
     # ── Section detection ──────────────────────────────────────────────────
     # Rich structural metadata is among the highest-ROI improvements for
@@ -103,6 +118,17 @@ class Settings(BaseSettings):
     # Over-retrieve for reranker pool. 25–30 is the sweet spot for policy docs:
     # enough recall for reranker without drowning it in noise.
     retrieval_candidate_k: int = Field(default=30, alias="RETRIEVAL_CANDIDATE_K")
+
+    # ── Hybrid BM25 + dense (Phase 2) ──────────────────────────────────────
+    enable_hybrid_bm25: bool = Field(default=True, alias="ENABLE_HYBRID_BM25")
+    bm25_top_k: int = Field(default=30, alias="BM25_TOP_K")
+    hybrid_rrf_k: int = Field(default=60, alias="HYBRID_RRF_K")
+    bm25_storage_dir: Path = Field(default=PROJECT_ROOT / "storage" / "bm25")
+
+    # ── Parent-document retrieval (Phase 2) ──────────────────────────────
+    enable_parent_document_retrieval: bool = Field(
+        default=True, alias="ENABLE_PARENT_DOCUMENT_RETRIEVAL"
+    )
 
     # ── Reranker (post-retrieval precision) ────────────────────────────────
     # bge-reranker-large > base for Context Precision on dense legal text.
@@ -138,6 +164,35 @@ class Settings(BaseSettings):
     # strict guard: reject unless fully supported; balanced: reject only clear hallucinations
     faithfulness_guard_mode: Literal["strict", "balanced", "off"] = Field(
         default="balanced", alias="FAITHFULNESS_GUARD_MODE"
+    )
+
+    # ── Code validation (Phase 3) ──────────────────────────────────────────
+    enable_code_validation: bool = Field(default=True, alias="ENABLE_CODE_VALIDATION")
+    enable_code_self_correction: bool = Field(
+        default=True, alias="ENABLE_CODE_SELF_CORRECTION"
+    )
+    code_self_correction_max_retries: int = Field(
+        default=1, alias="CODE_SELF_CORRECTION_MAX_RETRIES"
+    )
+    code_validation_use_heuristic: bool = Field(
+        default=True, alias="CODE_VALIDATION_USE_HEURISTIC"
+    )
+    code_validation_trigger_mode: Literal["answer_only", "answer_or_context"] = Field(
+        default="answer_only", alias="CODE_VALIDATION_TRIGGER_MODE"
+    )
+    code_validation_fail_mode: Literal["strip_code", "fallback"] = Field(
+        default="strip_code", alias="CODE_VALIDATION_FAIL_MODE"
+    )
+    code_validation_judge_mode: Literal["balanced", "strict"] = Field(
+        default="balanced", alias="CODE_VALIDATION_JUDGE_MODE"
+    )
+    code_validation_heuristic_min_ratio: float = Field(
+        default=0.8, alias="CODE_VALIDATION_HEURISTIC_MIN_RATIO"
+    )
+
+    # ── Corpus-scoped retrieval ────────────────────────────────────────────
+    enable_corpus_scoped_retrieval: bool = Field(
+        default=True, alias="ENABLE_CORPUS_SCOPED_RETRIEVAL"
     )
 
     # ── Agent ──────────────────────────────────────────────────────────────
@@ -185,10 +240,34 @@ class Settings(BaseSettings):
     # ── Evaluation ───────────────────────────────────────────────────────
     # Golden-set eval is the quality gate before chunking / retrieval changes.
     eval_dataset_path: Path = Field(default=PROJECT_ROOT / "data" / "eval" / "golden_dataset.json")
+    eval_guidebook_dataset_path: Path = Field(
+        default=PROJECT_ROOT / "golden_dataset_guidebook.json",
+        alias="EVAL_GUIDEBOOK_DATASET_PATH",
+    )
+    eval_corpus: Literal["all", "policy", "guidebook"] = Field(
+        default="all", alias="EVAL_CORPUS"
+    )
     eval_results_path: Path = Field(default=PROJECT_ROOT / "logs" / "evaluation_results.json")
     eval_llm_model: str = Field(default="qwen2.5:7b", alias="EVAL_LLM_MODEL")
     eval_max_samples: int = Field(default=0, alias="EVAL_MAX_SAMPLES")  # 0 = all cases
     eval_use_llm_judge: bool = Field(default=True, alias="EVAL_USE_LLM_JUDGE")
+
+    # ── CI smoke eval gate (retrieval-only) ────────────────────────────────
+    ci_smoke_dataset_path: Path = Field(
+        default=PROJECT_ROOT / "data" / "eval" / "golden_subset_ci_smoke.json",
+        alias="CI_SMOKE_DATASET_PATH",
+    )
+    ci_smoke_baseline_path: Path = Field(
+        default=PROJECT_ROOT / "data" / "eval" / "ci_smoke_baseline.json",
+        alias="CI_SMOKE_BASELINE_PATH",
+    )
+    ci_smoke_min_hit_rate: float = Field(default=0.75, alias="CI_SMOKE_MIN_HIT_RATE")
+    ci_smoke_min_context_precision: float = Field(
+        default=0.50, alias="CI_SMOKE_MIN_CONTEXT_PRECISION"
+    )
+    ci_smoke_min_context_recall: float = Field(
+        default=0.55, alias="CI_SMOKE_MIN_CONTEXT_RECALL"
+    )
 
     # ── PDF image extraction (citation visuals) ────────────────────────────
     enable_pdf_images: bool = Field(default=True, alias="ENABLE_PDF_IMAGES")
@@ -201,9 +280,9 @@ class Settings(BaseSettings):
         default=True, alias="ENABLE_COMPREHENSIVE_RETRIEVAL"
     )
     comprehensive_reranker_top_n: int = Field(
-        default=10, alias="COMPREHENSIVE_RERANKER_TOP_N"
+        default=12, alias="COMPREHENSIVE_RERANKER_TOP_N"
     )
-    comprehensive_max_subqueries: int = Field(default=8, alias="COMPREHENSIVE_MAX_SUBQUERIES")
+    comprehensive_max_subqueries: int = Field(default=12, alias="COMPREHENSIVE_MAX_SUBQUERIES")
 
     # ── Response language ──────────────────────────────────────────────────
     # english = always English (recommended for qwen2.5); match_query = follow user language
@@ -231,6 +310,8 @@ class Settings(BaseSettings):
             self.storage_dir,
             self.pdf_images_dir,
             self.chroma_persist_dir,
+            self.docstore_dir,
+            self.bm25_storage_dir,
             self.logs_dir,
             self.eval_dataset_path.parent,
         ):

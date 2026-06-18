@@ -5,7 +5,10 @@ Run golden-set evaluation against the Chroma-backed RAG index.
 Usage:
     python scripts/evaluate.py
     python scripts/evaluate.py --max-samples 5
-    python scripts/evaluate.py --no-judge          # retrieval metrics only (faster)
+    python scripts/evaluate.py --no-judge          # skip judge; still runs generation
+    python scripts/evaluate.py --retrieval-only    # retrieval metrics only (CI smoke)
+    python scripts/evaluate.py --corpus guidebook  # uses golden_dataset_guidebook.json (project root)
+    python scripts/evaluate.py --dataset golden_dataset_guidebook.json
     python scripts/evaluate.py --dataset data/eval/golden_dataset.json
 
 Prerequisites:
@@ -22,12 +25,21 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.config import settings
 from src.evaluation import (
     format_results_table,
     run_evaluation,
     save_eval_results,
 )
 from src.utils import logger, setup_logging
+
+
+def _resolve_dataset_path(args: argparse.Namespace) -> Path | None:
+    if args.dataset is not None:
+        return args.dataset
+    if args.corpus == "guidebook":
+        return settings.eval_guidebook_dataset_path
+    return None
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -49,13 +61,24 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--no-judge",
         action="store_true",
-        help="Skip LLM-as-judge (retrieval metrics only)",
+        help="Skip LLM-as-judge (generation still runs)",
+    )
+    parser.add_argument(
+        "--retrieval-only",
+        action="store_true",
+        help="Skip generation and judge; retrieval metrics only (CI smoke)",
     )
     parser.add_argument(
         "--output",
         type=Path,
         default=None,
         help="Override results output path (default: logs/evaluation_results.json)",
+    )
+    parser.add_argument(
+        "--corpus",
+        choices=["all", "policy", "guidebook"],
+        default=None,
+        help="Filter golden cases by corpus (default: EVAL_CORPUS env or all)",
     )
     return parser.parse_args(argv)
 
@@ -66,9 +89,11 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         run = run_evaluation(
-            dataset_path=args.dataset,
+            dataset_path=_resolve_dataset_path(args),
             max_samples=args.max_samples,
             use_llm_judge=not args.no_judge,
+            retrieval_only=args.retrieval_only,
+            corpus=args.corpus,
         )
     except FileNotFoundError as exc:
         logger.error("%s", exc)

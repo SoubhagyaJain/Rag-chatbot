@@ -41,12 +41,17 @@ class GoldenCase:
     expected_answer: str
     relevant_sections: list[str] = field(default_factory=list)
     expected_key_points: list[str] = field(default_factory=list)
+    corpus: str = "policy"
+    query_type: str = "factual"
+    source_file: str = ""
 
 
 @dataclass
 class CaseResult:
     id: str
     category: str
+    corpus: str
+    query_type: str
     question: str
     hit_rate: float
     context_precision: float
@@ -59,6 +64,12 @@ class CaseResult:
     judge_notes: dict[str, str] = field(default_factory=dict)
     pre_guard_answer: str = ""
     guard_modified: bool = False
+    code_validation_triggered: bool = False
+    code_validation_passed: bool | None = None
+    code_validation_method: str = ""
+    code_validation_explanation: str = ""
+    code_validation_failed_lines: list[str] = field(default_factory=list)
+    fallback_reason: str = "none"
 
 
 @dataclass
@@ -98,9 +109,23 @@ def load_golden_dataset(path: Path | None = None) -> list[GoldenCase]:
                 expected_answer=item.get("expected_answer", ""),
                 relevant_sections=item.get("relevant_sections", []),
                 expected_key_points=item.get("expected_key_points", []),
+                corpus=item.get("corpus", "policy"),
+                query_type=item.get("query_type", item.get("category", "factual")),
+                source_file=item.get("source_file", ""),
             )
         )
     return cases
+
+
+def filter_cases_by_corpus(
+    cases: list[GoldenCase],
+    corpus: str | None = None,
+) -> list[GoldenCase]:
+    """Filter golden cases by corpus (all | policy | guidebook)."""
+    selected = (corpus or settings.eval_corpus or "all").lower()
+    if selected == "all":
+        return cases
+    return [c for c in cases if c.corpus == selected]
 
 
 # ── Relevance matching (retrieval metrics) ───────────────────────────────────
@@ -311,22 +336,48 @@ def evaluate_case(
     *,
     use_llm_judge: bool = True,
     llm: Ollama | None = None,
+    retrieval_only: bool = False,
 ) -> CaseResult:
     """Evaluate one golden case: retrieve → generate → score."""
-    retriever = create_retriever(index)
+    from src.retrieval_scope import corpus_retrieval_filters
+
+    scope_filters = corpus_retrieval_filters(
+        case.corpus,
+        source_file=case.source_file or None,
+    )
+    retriever = create_retriever(index, filters=scope_filters)
     nodes = retriever.retrieve(case.question)
 
     hit_rate, ctx_prec, ctx_rec, rel_count, _ = compute_retrieval_metrics(
         nodes, case.relevant_sections
     )
 
-    pre_guard, answer = generate_grounded_answer_with_trace(
+    if retrieval_only:
+        return CaseResult(
+            id=case.id,
+            category=case.category,
+            corpus=case.corpus,
+            query_type=case.query_type,
+            question=case.question,
+            hit_rate=hit_rate,
+            context_precision=ctx_prec,
+            context_recall=ctx_rec,
+            faithfulness=None,
+            answer_relevancy=None,
+            generated_answer="",
+            retrieved_count=len(nodes),
+            relevant_retrieved_count=rel_count,
+        )
+
+    trace = generate_grounded_answer_with_trace(
         case.question, nodes, Settings.llm
     )
-    guard_modified = (
-        pre_guard.strip() != answer.strip()
+    pre_guard = trace.pre_guard_answer
+    answer = trace.final_answer
+    guard_modified = trace.fallback_reason == "faithfulness" or (
+        trace.post_guard_answer.strip() != answer.strip()
         and INSUFFICIENT_INFO_MESSAGE in answer
-        and INSUFFICIENT_INFO_MESSAGE not in pre_guard
+        and INSUFFICIENT_INFO_MESSAGE not in trace.post_guard_answer
     )
 
     faithfulness: float | None = None
@@ -349,6 +400,8 @@ def evaluate_case(
     return CaseResult(
         id=case.id,
         category=case.category,
+        corpus=case.corpus,
+        query_type=case.query_type,
         question=case.question,
         hit_rate=hit_rate,
         context_precision=ctx_prec,
@@ -358,6 +411,12 @@ def evaluate_case(
         generated_answer=answer[:500],
         pre_guard_answer=pre_guard[:500],
         guard_modified=guard_modified,
+        code_validation_triggered=trace.code_validation.triggered,
+        code_validation_passed=trace.code_validation.passed,
+        code_validation_method=trace.code_validation.validation_method,
+        code_validation_explanation=trace.code_validation.explanation[:300],
+        code_validation_failed_lines=trace.code_validation.failed_lines[:5],
+        fallback_reason=trace.fallback_reason,
         retrieved_count=len(nodes),
         relevant_retrieved_count=rel_count,
         judge_notes=judge_notes,
@@ -369,11 +428,34 @@ def _mean(values: list[float | None]) -> float | None:
     return sum(nums) / len(nums) if nums else None
 
 
+def _aggregate_for_cases(results: list[CaseResult]) -> dict[str, float | None]:
+    triggered = [r for r in results if r.code_validation_triggered]
+    code_pass_values: list[float] = [
+        1.0 if r.code_validation_passed else 0.0
+        for r in triggered
+        if r.code_validation_passed is not None
+    ]
+    low_conf_values = [
+        1.0 if r.fallback_reason == "code_validation" else 0.0 for r in results
+    ]
+    return {
+        "hit_rate": _mean([r.hit_rate for r in results]),
+        "context_precision": _mean([r.context_precision for r in results]),
+        "context_recall": _mean([r.context_recall for r in results]),
+        "faithfulness": _mean([r.faithfulness for r in results]),
+        "answer_relevancy": _mean([r.answer_relevancy for r in results]),
+        "code_validation_pass_rate": _mean(code_pass_values) if code_pass_values else None,
+        "low_confidence_fallback_rate": _mean(low_conf_values) if low_conf_values else None,
+    }
+
+
 def run_evaluation(
     *,
     dataset_path: Path | None = None,
     max_samples: int | None = None,
     use_llm_judge: bool = True,
+    retrieval_only: bool = False,
+    corpus: str | None = None,
 ) -> EvalRun:
     """
     Run full golden-set evaluation against the Chroma-backed index.
@@ -386,42 +468,60 @@ def run_evaluation(
         )
 
     configure_llama_index()
-    Settings.llm = Ollama(
-        model=settings.llm_model,
-        base_url=settings.ollama_base_url,
-        temperature=settings.llm_temperature,
-        request_timeout=settings.llm_request_timeout,
-    )
+    if not retrieval_only:
+        Settings.llm = Ollama(
+            model=settings.llm_model,
+            base_url=settings.ollama_base_url,
+            temperature=settings.llm_temperature,
+            request_timeout=settings.llm_request_timeout,
+        )
 
     index = load_index()
-    cases = load_golden_dataset(dataset_path)
+    cases = filter_cases_by_corpus(load_golden_dataset(dataset_path), corpus)
     limit = max_samples or settings.eval_max_samples
     if limit and limit > 0:
         cases = cases[:limit]
 
-    judge_llm = _get_judge_llm() if use_llm_judge and settings.eval_use_llm_judge else None
+    effective_judge = use_llm_judge and not retrieval_only
+    judge_llm = (
+        _get_judge_llm()
+        if effective_judge and settings.eval_use_llm_judge
+        else None
+    )
     start = time.perf_counter()
     results: list[CaseResult] = []
 
     for i, case in enumerate(cases, 1):
         logger.info("Evaluating [%d/%d] %s", i, len(cases), case.id)
-        result = evaluate_case(case, index, use_llm_judge=use_llm_judge, llm=judge_llm)
+        result = evaluate_case(
+            case,
+            index,
+            use_llm_judge=effective_judge,
+            llm=judge_llm,
+            retrieval_only=retrieval_only,
+        )
         results.append(result)
 
     duration = time.perf_counter() - start
-    aggregate = {
-        "hit_rate": _mean([r.hit_rate for r in results]),
-        "context_precision": _mean([r.context_precision for r in results]),
-        "context_recall": _mean([r.context_recall for r in results]),
-        "faithfulness": _mean([r.faithfulness for r in results]),
-        "answer_relevancy": _mean([r.answer_relevancy for r in results]),
-    }
+    aggregate = _aggregate_for_cases(results)
+    by_corpus: dict[str, dict[str, float | None]] = {}
+    by_query_type: dict[str, dict[str, float | None]] = {}
+    for key, attr in (("corpus", "corpus"), ("query_type", "query_type")):
+        groups: dict[str, list[CaseResult]] = {}
+        for result in results:
+            label = getattr(result, attr)
+            groups.setdefault(label, []).append(result)
+        target = by_corpus if attr == "corpus" else by_query_type
+        for label, group in groups.items():
+            target[label] = _aggregate_for_cases(group)
+    aggregate["by_corpus"] = by_corpus
+    aggregate["by_query_type"] = by_query_type
 
     run = EvalRun(
         run_id=datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S"),
         timestamp=datetime.now(timezone.utc).isoformat(),
-        model=settings.llm_model,
-        judge_model=settings.eval_llm_model,
+        model="retrieval-only" if retrieval_only else settings.llm_model,
+        judge_model="none" if retrieval_only else settings.eval_llm_model,
         top_k=get_final_top_k(),
         retrieval_config=get_retrieval_config_summary(),
         generation_config=get_generation_config_summary(),
@@ -463,7 +563,19 @@ def format_results_table(run: EvalRun) -> str:
     lines.append("AGGREGATE SCORES")
     lines.append(sep)
     for metric, value in run.aggregate.items():
-        val_str = f"{value:.3f}" if value is not None else "—"
+        if isinstance(value, dict):
+            lines.append(f"  {metric}:")
+            for sub_key, sub_val in value.items():
+                if isinstance(sub_val, dict):
+                    lines.append(f"    {sub_key}:")
+                    for m, v in sub_val.items():
+                        val_str = f"{v:.3f}" if isinstance(v, (int, float)) and v is not None else "—"
+                        lines.append(f"      {m:<18} {val_str}")
+                else:
+                    val_str = f"{sub_val:.3f}" if isinstance(sub_val, (int, float)) and sub_val is not None else "—"
+                    lines.append(f"    {sub_key:<18} {val_str}")
+            continue
+        val_str = f"{value:.3f}" if isinstance(value, (int, float)) and value is not None else "—"
         lines.append(f"  {metric:<20} {val_str}")
     lines.append(f"\nRun ID: {run.run_id} | Cases: {run.case_count} | Duration: {run.duration_seconds}s")
     return "\n".join(lines)

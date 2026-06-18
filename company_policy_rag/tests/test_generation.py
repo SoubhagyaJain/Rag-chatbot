@@ -12,9 +12,10 @@ from src.generation import (
     _preserve_balanced_partial_answer,
     apply_faithfulness_guard,
     build_grounded_response_synthesizer,
+    generate_grounded_answer_with_trace,
     normalize_balanced_answer,
 )
-from src.prompts import INSUFFICIENT_INFO_MESSAGE, PARTIAL_ANSWER_PREFIX
+from src.prompts import INSUFFICIENT_INFO_MESSAGE, LOW_CONFIDENCE_MESSAGE, PARTIAL_ANSWER_PREFIX
 
 
 def test_build_grounded_response_synthesizer() -> None:
@@ -140,6 +141,43 @@ def test_normalize_strips_inverted_abstention_first() -> None:
     result = normalize_balanced_answer(inverted)
     assert not result.startswith(INSUFFICIENT_INFO_MESSAGE)
     assert "remote work" in result.lower()
+
+
+def test_generate_trace_empty_nodes_abstains() -> None:
+    trace = generate_grounded_answer_with_trace("test", [], MagicMock())
+    assert trace.final_answer == INSUFFICIENT_INFO_MESSAGE
+    assert trace.fallback_reason == "none"
+    assert not trace.code_validation.triggered
+
+
+def test_generate_trace_code_validation_fallback(monkeypatch) -> None:
+    monkeypatch.setattr("src.generation.settings.enable_faithfulness_check", False)
+    monkeypatch.setattr("src.code_validation.settings.enable_code_validation", True)
+    monkeypatch.setattr("src.code_validation.settings.code_validation_use_heuristic", True)
+    monkeypatch.setattr("src.code_validation.settings.enable_code_self_correction", False)
+
+    mock_synth = MagicMock()
+    mock_synth.get_response.return_value = "```python\ndef invented():\n    return 0\n```"
+    mock_synth._llm = MagicMock()
+    monkeypatch.setattr(
+        "src.generation.build_grounded_response_synthesizer",
+        lambda llm=None: mock_synth,
+    )
+
+    nodes = [
+        NodeWithScore(
+            node=TextNode(
+                text="```python\ndef real():\n    return 1\n```",
+                metadata={"content_type": "code"},
+            ),
+            score=0.9,
+        )
+    ]
+    trace = generate_grounded_answer_with_trace("show code", nodes, MagicMock())
+    assert trace.final_answer == LOW_CONFIDENCE_MESSAGE
+    assert trace.fallback_reason == "code_validation"
+    assert trace.code_validation.triggered
+    assert trace.code_validation.fallback_applied
 
 
 def test_strict_guard_rejection_abstains(monkeypatch) -> None:

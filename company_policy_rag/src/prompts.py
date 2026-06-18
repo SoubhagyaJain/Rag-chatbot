@@ -23,6 +23,13 @@ INSUFFICIENT_INFO_MESSAGE = (
     "this question reliably."
 )
 
+# Returned when code validation fails after self-correction (partial grounding)
+LOW_CONFIDENCE_MESSAGE = (
+    "I found related excerpts but cannot verify every detail in my answer "
+    "against the retrieved documents. Please review the cited sources directly "
+    "or ask a more specific question."
+)
+
 PARTIAL_ANSWER_PREFIX = "Based on the available information in the documents,"
 
 # Balanced guard: minimum partial-answer length before stripping a trailing abstention suffix
@@ -96,6 +103,49 @@ Question: How many sick days do employees receive?
 Excerpt [Source 1]: "New employees receive three days of paid sick leave after 120 days of employment."
 Bad answer: Based on the available information in the documents, new employees receive three days of paid sick leave after 120 days of employment.
 Why bad: Every factual sentence must end with a [Source N] tag — omitting tags breaks source verification.
+
+### Example M — GOOD (building blocks from section headings)
+Question: List and explain the 6 building blocks of AI Agents.
+Excerpts [Source 1]: "1. Role-playing …" [Source 2]: "2. Tools …" [Source 3]: "6. Memory …"
+Answer: Based on the available information in the documents:
+1. Role-playing — defines the agent's role and task description [Source 1].
+2. Tools — agents use tools to access real-time and structured information [Source 2].
+3. Memory — agents retain context across steps [Source 3].
+The excerpts name additional building blocks in other sections; those items are not fully described in the retrieved excerpts.
+
+### Example N — GOOD (memory types enumeration)
+Question: What types of memory do agents use?
+Excerpt [Source 1]: short-term memory for recent context; long-term memory for persistent knowledge.
+Answer: Based on the available information in the documents:
+1. Short-term memory — holds recent conversation and step context [Source 1].
+2. Long-term memory — stores persistent knowledge across sessions [Source 1].
+
+### Example O — BAD (invented list items) — NEVER DO THIS
+Question: What roles can sub-agents play in orchestration?
+Excerpt [Source 1]: Research Agent searches and retrieves relevant data.
+Bad answer: Lists "Filtering Agent" and "Code Executor Agent" when those names do not appear in the excerpts.
+Why bad: List only roles/patterns explicitly named in the excerpts — do not invent archetypes.
+"""
+
+FEW_SHOT_CODE_BALANCED = """
+### Example K — GOOD (code quoted verbatim from excerpt)
+Question: Show the currency conversion tool example.
+Excerpt [Source 1]: [CODE BLOCK — guide.pdf p.20]
+def convert_currency(amount, from_curr, to_curr):
+    rate = get_exchange_rate(from_curr, to_curr)
+    return amount * rate
+Answer: Based on the available information in the documents, the currency tool is defined as:
+```python
+def convert_currency(amount, from_curr, to_curr):
+    rate = get_exchange_rate(from_curr, to_curr)
+    return amount * rate
+```
+[Source 1]
+
+### Example L — BAD (invented code) — NEVER DO THIS
+Question: Show the currency conversion tool example.
+Bad answer includes `def fetch_forex_api()` or renames functions not present in the excerpt.
+Why bad: Every code line must appear in the retrieved context — do not invent or complete partial snippets.
 """
 
 # ── Strict generation prompts ────────────────────────────────────────────────
@@ -171,12 +221,22 @@ BALANCED_TEXT_QA_PROMPT_TMPL = (
     "15. For outside employment / second job questions, check electronic communications and "
     "ethics sections for conflict-of-interest rules before abstaining.\n"
     "16. For LIST or ENUMERATION questions (e.g. '6 building blocks', 'types of memory'), "
-    "structure the answer as a numbered list matching the document. Cover each item ONLY "
-    "if the excerpts support it; explicitly say when a requested item is not in the excerpts.\n"
+    "structure the answer as a numbered list matching the document. When excerpts contain "
+    "section titles or numbered headings that map to list items, synthesize the list from "
+    "those headings — do not claim the list is absent. Cover each item ONLY if the excerpts "
+    "support it; note gaps for missing items.\n"
+    "16b. For COUNT questions ('how many'), state a number ONLY if explicitly stated in "
+    "excerpts — do not guess from outside knowledge.\n"
+    "16c. For roles/patterns lists, include ONLY names that appear verbatim (or as clear "
+    "headings) in excerpts. On enumeration questions, do not abstain when two or more "
+    "requested items appear as headings — list what is supported and note gaps.\n"
     "17. Never define or expand acronyms (e.g. MCP) unless the excerpts define them — "
     "quote the excerpt's wording instead of outside knowledge.\n"
-    "18. Do not invent examples. Use excerpt examples only, or state that no example was provided.\n\n"
+    "18. Do not invent examples. Use excerpt examples only, or state that no example was provided.\n"
+    "19. When showing code, copy lines exactly from excerpts; do not paraphrase, rename functions, "
+    "or complete partial snippets. If code is incomplete in the excerpts, say so.\n\n"
     f"{FEW_SHOT_BALANCED}\n"
+    f"{FEW_SHOT_CODE_BALANCED}\n"
     "DOCUMENT EXCERPTS:\n"
     "{context_str}\n\n"
     "QUESTION: {query_str}\n\n"
@@ -271,7 +331,8 @@ When using policy_search:
    When policy_search returns [Source N] tags, preserve them verbatim in your final response.
    Do not replace tags with page numbers or filenames alone.
 6. For LIST or ENUMERATION questions, answer as a numbered list. If a requested item is missing from the tool output, say it was not found in the retrieved excerpts — do not guess.
-7. Abstain only when retrieved text is completely irrelevant or silent on the topic.
+7. When showing code from tool output, copy lines exactly — never invent functions or complete partial snippets.
+8. Abstain only when retrieved text is completely irrelevant or silent on the topic.
 
 For greetings or capability questions, respond directly without policy_search.
 For follow-ups, expand pronouns from chat history into a complete standalone policy_search query.
@@ -317,6 +378,63 @@ ANSWER:
 {answer}
 
 VERDICT:"""
+
+CODE_LINE_VALIDATION_PROMPT_STRICT = """You verify whether every line of CODE in an ANSWER appears in the CONTEXT.
+
+Answer YES only if each non-empty code line in the ANSWER is copied from the CONTEXT (allowing minor whitespace).
+Answer NO if any code line, function name, or API call in the ANSWER is not present in the CONTEXT.
+
+Respond in this format:
+VERDICT: YES or NO
+EXPLANATION: <one sentence>
+
+CONTEXT:
+{context}
+
+ANSWER:
+{answer}
+"""
+
+CODE_LINE_VALIDATION_PROMPT_BALANCED = """You verify whether CODE in an ANSWER is supported by the CONTEXT.
+
+Answer YES if:
+- The ANSWER contains no code blocks, OR
+- Each function/class definition in the ANSWER appears in the CONTEXT (minor whitespace/formatting OK), OR
+- The code illustrates concepts already described in CONTEXT prose
+
+Answer NO only if the ANSWER invents functions, APIs, or code lines with no support in CONTEXT.
+
+Ignore markdown formatting, [Source N] tags, and [CODE BLOCK] prefixes when comparing.
+{failed_lines_section}
+Respond in this format:
+VERDICT: YES or NO
+EXPLANATION: <one sentence>
+
+CONTEXT:
+{context}
+
+ANSWER:
+{answer}
+"""
+
+CODE_SELF_CORRECTION_PROMPT = """Rewrite the ANSWER to fix unsupported code lines using ONLY the CONTEXT.
+
+Rules:
+- Remove or replace any code line not present in the CONTEXT.
+- Copy supported code verbatim from the CONTEXT.
+- Keep [Source N] citation tags on factual sentences.
+- If code cannot be verified, describe what the excerpts show in prose instead of inventing code.
+- Write in English.
+
+QUESTION: {query}
+
+CONTEXT:
+{context}
+
+CURRENT ANSWER:
+{answer}
+
+CORRECTED ANSWER:"""
 
 
 def resolve_grounding_mode(
@@ -396,6 +514,31 @@ def get_faithfulness_guard_prompt(*, mode: GroundingMode | None = None) -> str:
     return FAITHFULNESS_GUARD_BALANCED
 
 
+def get_code_validation_prompt(
+    *,
+    mode: str = "balanced",
+    failed_lines: list[str] | None = None,
+) -> str:
+    failed_section = ""
+    if failed_lines:
+        lines = "\n".join(f"- {line}" for line in failed_lines[:8])
+        failed_section = f"\nLines that failed heuristic check:\n{lines}\n"
+    if mode == "strict":
+        return CODE_LINE_VALIDATION_PROMPT_STRICT.format(
+            context="{context}",
+            answer="{answer}",
+        )
+    return CODE_LINE_VALIDATION_PROMPT_BALANCED.format(
+        failed_lines_section=failed_section,
+        context="{context}",
+        answer="{answer}",
+    )
+
+
+def get_code_self_correction_prompt() -> str:
+    return CODE_SELF_CORRECTION_PROMPT
+
+
 def format_node_for_prompt(node: NodeWithScore, index: int) -> str:
     """
     Format a retrieved chunk with source metadata for the generation prompt.
@@ -437,4 +580,9 @@ def get_generation_config_summary() -> dict[str, str | bool]:
         "strict_grounding": settings.strict_grounding,
         "enable_faithfulness_check": settings.enable_faithfulness_check,
         "faithfulness_guard_mode": settings.faithfulness_guard_mode,
+        "enable_code_validation": settings.enable_code_validation,
+        "enable_code_self_correction": settings.enable_code_self_correction,
+        "code_validation_trigger_mode": settings.code_validation_trigger_mode,
+        "code_validation_fail_mode": settings.code_validation_fail_mode,
+        "code_validation_judge_mode": settings.code_validation_judge_mode,
     }

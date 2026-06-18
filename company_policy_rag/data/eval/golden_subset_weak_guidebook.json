@@ -1,0 +1,191 @@
+{
+  "version": "1.0",
+  "corpus": "guidebook",
+  "source_document": "data/legal/AI_Agents_guidebook.pdf",
+  "description": "Weak-case subset for post-reindex validation (code, enumeration, tools_real_world).",
+  "case_count": 10,
+  "query_type_counts": {
+    "enumeration": 5,
+    "code": 4,
+    "factual": 1
+  },
+  "cases": [
+    {
+      "id": "six_building_blocks",
+      "corpus": "guidebook",
+      "query_type": "enumeration",
+      "category": "enumeration",
+      "question": "List and explain the 6 building blocks of AI Agents.",
+      "expected_answer": "Should list all six blocks from the guidebook.",
+      "relevant_sections": [
+        "building blocks",
+        "Role",
+        "Tools",
+        "Memory",
+        "Guardrails",
+        "Planning"
+      ],
+      "expected_key_points": [
+        "building",
+        "block",
+        "tools",
+        "memory"
+      ],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "currency_tool_example",
+      "corpus": "guidebook",
+      "query_type": "code",
+      "category": "code",
+      "question": "Show the currency conversion tool example and explain how it is invoked.",
+      "expected_answer": "Should reference the real-time currency tool code example.",
+      "relevant_sections": [
+        "currency",
+        "conversion",
+        "tool"
+      ],
+      "expected_key_points": [
+        "currency",
+        "tool"
+      ],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "custom_tools",
+      "corpus": "guidebook",
+      "query_type": "code",
+      "category": "code",
+      "question": "How do you build custom tools for an agent?",
+      "expected_answer": "Should describe custom tool creation with code.",
+      "relevant_sections": [
+        "custom tool",
+        "Tools allow"
+      ],
+      "expected_key_points": [
+        "custom",
+        "tool"
+      ],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "design_patterns_popular",
+      "corpus": "guidebook",
+      "query_type": "enumeration",
+      "category": "enumeration",
+      "question": "What are the most popular agent design patterns mentioned?",
+      "expected_answer": "Should list design patterns like ReAct.",
+      "relevant_sections": [
+        "design patterns",
+        "ReAct",
+        "popular"
+      ],
+      "expected_key_points": [
+        "pattern",
+        "ReAct"
+      ],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "code_available_links",
+      "corpus": "guidebook",
+      "query_type": "code",
+      "category": "code",
+      "question": "Where does the guidebook point readers for full code examples?",
+      "expected_answer": "Should mention code availability links.",
+      "relevant_sections": [
+        "code is available",
+        "Check this code"
+      ],
+      "expected_key_points": [
+        "code",
+        "available"
+      ],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "memory_short_long",
+      "corpus": "guidebook",
+      "query_type": "enumeration",
+      "category": "enumeration",
+      "question": "What types of memory do agents use?",
+      "expected_answer": "Should describe memory categories.",
+      "relevant_sections": [
+        "Memory",
+        "short",
+        "long"
+      ],
+      "expected_key_points": [
+        "memory"
+      ],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "enumeration_subagents",
+      "corpus": "guidebook",
+      "query_type": "enumeration",
+      "category": "enumeration",
+      "question": "What roles can sub-agents play in orchestration?",
+      "expected_answer": "Should describe sub-agent specialization.",
+      "relevant_sections": [
+        "sub-agent",
+        "manager",
+        "specialist"
+      ],
+      "expected_key_points": [
+        "sub-agent"
+      ],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "code_check_this_out",
+      "corpus": "guidebook",
+      "query_type": "code",
+      "category": "code",
+      "question": "What code walkthroughs does the guidebook highlight with Check this out?",
+      "expected_answer": "Should reference highlighted code sections.",
+      "relevant_sections": [
+        "Check this out",
+        "code"
+      ],
+      "expected_key_points": [
+        "code"
+      ],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "tools_real_world",
+      "corpus": "guidebook",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "What real-world capability does the currency tool demonstrate?",
+      "expected_answer": "Should explain real-time currency conversion tool.",
+      "relevant_sections": [
+        "real-time currency",
+        "conversion"
+      ],
+      "expected_key_points": [
+        "currency"
+      ],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "agent_building_blocks_count",
+      "corpus": "guidebook",
+      "query_type": "enumeration",
+      "category": "enumeration",
+      "question": "How many building blocks of AI agents does the guidebook describe?",
+      "expected_answer": "Should state six building blocks.",
+      "relevant_sections": [
+        "6",
+        "six",
+        "building blocks"
+      ],
+      "expected_key_points": [
+        "six",
+        "6"
+      ],
+      "source_file": "AI_Agents_guidebook.pdf"
+    }
+  ]
+}

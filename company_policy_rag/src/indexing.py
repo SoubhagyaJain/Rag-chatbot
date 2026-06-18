@@ -28,11 +28,15 @@ from llama_index.core import Settings, StorageContext, VectorStoreIndex
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.schema import Document, TextNode
 from llama_index.embeddings.ollama import OllamaEmbedding
-from llama_index.readers.file import PDFReader
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
+from src.bm25_index import clear_bm25_storage, rebuild_bm25_from_chroma, remove_bm25_for_source
+from src.chunking import documents_to_hierarchical_nodes
 from src.config import PROJECT_ROOT, settings
+from src.diagram_captions import build_caption_nodes
+from src.docstore import clear_parent_store, remove_parents_for_source
 from src.pdf_images import clear_all_pdf_images, extract_pdf_images
+from src.pdf_parsers import load_pdf_as_documents
 from src.utils import (
     SectionHeading,
     SectionTracker,
@@ -43,6 +47,52 @@ from src.utils import (
     section_metadata_from_context,
     timed,
 )
+
+
+def _chroma_not_found_errors() -> tuple[type[BaseException], ...]:
+    """Exception types for missing Chroma collections (0.5.x and 1.x)."""
+    errors: list[type[BaseException]] = [ValueError]
+    not_found = getattr(chromadb.errors, "NotFoundError", None)
+    if not_found is not None:
+        errors.append(not_found)
+    invalid = getattr(chromadb.errors, "InvalidCollectionException", None)
+    if invalid is not None:
+        errors.append(invalid)
+    return tuple(errors)
+
+
+def _is_chroma_corruption(exc: BaseException) -> bool:
+    """True when persisted Chroma metadata is unreadable (version mismatch / corrupt store)."""
+    if isinstance(exc, getattr(chromadb.errors, "InternalError", Exception)):
+        return True
+    message = str(exc).lower()
+    markers = (
+        "mismatched types",
+        "metadata segment",
+        "error executing plan",
+        "decoding column",
+    )
+    return any(marker in message for marker in markers)
+
+
+def wipe_chroma_persist_dir() -> None:
+    """Delete the Chroma persist directory and reset in-process client cache."""
+    reset_chroma_client_cache()
+    path = settings.chroma_persist_dir
+    if path.exists():
+        try:
+            shutil.rmtree(path)
+            logger.warning("Removed corrupted Chroma persist dir: %s", path)
+        except OSError as exc:
+            logger.error("Could not remove Chroma dir %s: %s", path, exc)
+            raise
+    path.mkdir(parents=True, exist_ok=True)
+    reset_chroma_client_cache()
+
+
+def _safe_collection_count(collection: Collection) -> int:
+    """Return collection.count() or raise corruption error for caller to handle."""
+    return collection.count()
 
 
 def _headings_from_section_path(section_path: str) -> list[SectionHeading]:
@@ -179,7 +229,7 @@ def get_chroma_collection(
         try:
             client.delete_collection(name=settings.chroma_collection_name)
             logger.info("Deleted Chroma collection: %s", settings.chroma_collection_name)
-        except (ValueError, chromadb.errors.NotFoundError, chromadb.errors.InvalidCollectionException):
+        except _chroma_not_found_errors():
             pass
 
     return client.get_or_create_collection(
@@ -196,6 +246,17 @@ def get_chroma_vector_store(
     vector_store = ChromaVectorStore(chroma_collection=collection)
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
     return vector_store, storage_context, collection
+
+
+def _collection_names(client: chromadb.ClientAPI) -> list[str]:
+    """Normalize Chroma list_collections() results across API versions."""
+    names: list[str] = []
+    for item in client.list_collections():
+        if hasattr(item, "name"):
+            names.append(str(item.name))
+        else:
+            names.append(str(item))
+    return names
 
 
 def probe_chroma_index(*, clear_cache: bool = False) -> dict[str, Any]:
@@ -223,8 +284,7 @@ def probe_chroma_index(*, clear_cache: bool = False) -> dict[str, Any]:
 
     try:
         client = get_chroma_client()
-        # Chroma 0.6+ list_collections() returns CollectionName objects; str() is portable.
-        result["collections"] = [str(c) for c in client.list_collections()]
+        result["collections"] = _collection_names(client)
         if settings.chroma_collection_name not in result["collections"]:
             result["error"] = (
                 f"Collection {settings.chroma_collection_name!r} not found. "
@@ -288,7 +348,7 @@ def _prepare_nodes_for_chroma(nodes: list[TextNode]) -> list[TextNode]:
 
 def _get_indexed_file_hashes(collection: Collection) -> dict[str, str]:
     """Map source_file → file_hash for incremental indexing decisions."""
-    if collection.count() == 0:
+    if _safe_collection_count(collection) == 0:
         return {}
 
     result = collection.get(include=["metadatas"])
@@ -313,7 +373,9 @@ def _delete_chunks_for_source(collection: Collection, source_file: str) -> None:
 
 
 def remove_document_from_index(source_file: str) -> int:
-    """Remove all Chroma chunks whose source_file metadata matches the basename."""
+    """Remove all Chroma chunks, parent nodes, and BM25 entries for a source file."""
+    remove_parents_for_source(source_file)
+    remove_bm25_for_source(source_file)
     collection = get_chroma_collection()
     try:
         peek = collection.get(where={"source_file": source_file}, include=[])
@@ -446,33 +508,20 @@ def enrich_documents_with_sections(documents: list[Document]) -> list[Document]:
 
 def load_pdf_documents(file_path: Path) -> list[Document]:
     """Load a single PDF with per-page Documents and base metadata."""
-    reader = PDFReader()
-    page_docs = reader.load_data(file=file_path)
-
     document_type = _document_type_for_path(file_path)
     category = infer_category(file_path, document_type)
     source_file = file_path.name
     file_hash = _file_hash(file_path)
 
-    enriched: list[Document] = []
-    for page_doc in page_docs:
-        page_label = page_doc.metadata.get("page_label") or page_doc.metadata.get("page_number")
-        page_number = _parse_page_number(page_label)
-
-        page_doc.metadata.update(
-            {
-                "source_file": source_file,
-                "file_path": str(file_path.relative_to(PROJECT_ROOT)),
-                "page_number": page_number,
-                "page_label": str(page_label) if page_label else None,
-                "document_type": document_type,
-                "category": category,
-                "file_hash": file_hash,
-            }
-        )
-        enriched.append(page_doc)
-
-    return enrich_documents_with_sections(enriched)
+    base_metadata = {
+        "source_file": source_file,
+        "file_path": str(file_path.relative_to(PROJECT_ROOT)),
+        "document_type": document_type,
+        "category": category,
+        "file_hash": file_hash,
+    }
+    page_docs = load_pdf_as_documents(file_path, base_metadata=base_metadata)
+    return enrich_documents_with_sections(page_docs)
 
 
 def load_all_documents(
@@ -552,10 +601,29 @@ def enrich_nodes_with_sections(nodes: list[TextNode]) -> list[TextNode]:
 
 
 def documents_to_nodes(documents: list[Document]) -> list[TextNode]:
-    """Parse Documents into Chroma-ready TextNodes with section metadata."""
-    parser = get_node_parser()
-    nodes = parser.get_nodes_from_documents(documents, show_progress=True)
-    nodes = enrich_nodes_with_sections(nodes)
+    """Parse Documents into Chroma-ready TextNodes with hierarchical chunking."""
+    result = documents_to_hierarchical_nodes(documents, persist_parents=True)
+    nodes = enrich_nodes_with_sections(result.embed_nodes)
+
+    # Diagram captions per source file (after image extraction manifests exist)
+    by_file: dict[str, list[Document]] = {}
+    for doc in documents:
+        key = (doc.metadata or {}).get("source_file", "")
+        by_file.setdefault(str(key), []).append(doc)
+
+    caption_nodes: list[TextNode] = []
+    for source_file, file_docs in by_file.items():
+        if not source_file or not file_docs:
+            continue
+        file_hash = str((file_docs[0].metadata or {}).get("file_hash", ""))
+        caption_nodes.extend(
+            build_caption_nodes(file_docs, file_hash=file_hash, source_file=source_file)
+        )
+
+    if caption_nodes:
+        nodes.extend(caption_nodes)
+        logger.info("Added %d diagram caption nodes", len(caption_nodes))
+
     return _prepare_nodes_for_chroma(nodes)
 
 
@@ -614,10 +682,31 @@ def build_index(
     configure_llama_index()
     result = IndexingResult()
 
-    if force_rebuild and settings.chroma_persist_dir.exists():
-        shutil.rmtree(settings.chroma_persist_dir)
-        settings.chroma_persist_dir.mkdir(parents=True, exist_ok=True)
-        logger.info("Cleared Chroma persist dir: %s", settings.chroma_persist_dir)
+    # Detect corrupted / version-mismatched Chroma store before incremental reads.
+    if not force_rebuild and settings.chroma_persist_dir.exists():
+        try:
+            probe_client = get_chroma_client()
+            for name in _collection_names(probe_client):
+                if name == settings.chroma_collection_name:
+                    coll = probe_client.get_collection(name=settings.chroma_collection_name)
+                    _safe_collection_count(coll)
+                    break
+        except Exception as exc:
+            if _is_chroma_corruption(exc):
+                logger.error(
+                    "Chroma store at %s is corrupted or incompatible (%s). "
+                    "Wiping and rebuilding index.",
+                    settings.chroma_persist_dir,
+                    exc,
+                )
+                force_rebuild = True
+            else:
+                raise
+
+    if force_rebuild:
+        clear_parent_store()
+        clear_bm25_storage()
+        wipe_chroma_persist_dir()
 
     if force_rebuild and settings.enable_pdf_images:
         clear_all_pdf_images()
@@ -656,9 +745,11 @@ def build_index(
             return load_index(), result
         return VectorStoreIndex.from_vector_store(vector_store, storage_context=storage_context), result
 
-    # Remove stale chunks for files being updated (hash changed or new file)
+    # Remove stale chunks, parents, and BM25 entries for files being updated
     for path in paths_to_index:
         _delete_chunks_for_source(collection, path.name)
+        remove_parents_for_source(path.name)
+        remove_bm25_for_source(path.name)
 
     if settings.enable_pdf_images:
         for path in paths_to_index:
@@ -670,9 +761,11 @@ def build_index(
                     force=force_rebuild,
                 )
             except Exception as exc:
-                msg = f"PDF image extraction failed for {path.name}: {exc}"
-                logger.warning(msg)
-                result.errors.append(msg)
+                logger.warning(
+                    "PDF image extraction failed for %s: %s (indexing continues)",
+                    path.name,
+                    exc,
+                )
 
     nodes = documents_to_nodes(documents)
     result.nodes_created = len(nodes)
@@ -694,6 +787,16 @@ def build_index(
 
     stats = get_collection_stats()
     logger.info("Chroma collection '%s' now has %d chunks", stats["collection"], stats["count"])
+
+    if settings.enable_hybrid_bm25 and stats["count"] > 0:
+        try:
+            bm25_index = rebuild_bm25_from_chroma()
+            if bm25_index:
+                logger.info("BM25 index synced: %d documents", bm25_index.size)
+        except Exception as exc:
+            msg = f"BM25 index rebuild failed: {exc}"
+            logger.warning(msg)
+            result.errors.append(msg)
 
     return index, result
 

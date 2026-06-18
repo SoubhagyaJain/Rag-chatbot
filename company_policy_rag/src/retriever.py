@@ -20,9 +20,13 @@ from llama_index.core import VectorStoreIndex
 from llama_index.core.postprocessor.types import BaseNodePostprocessor
 from llama_index.core.schema import NodeWithScore, QueryBundle
 
+from src.bm25_index import get_bm25_corpus_size
+from src.retrieval_scope import ScopeFilteredRetriever
 from src.citations import log_retrieval_stage
 from src.config import settings
+from src.hybrid_retrieval import HybridRetriever, bm25_nodes_for_query, reciprocal_rank_fusion
 from src.indexing import load_index
+from src.parent_retrieval import expand_to_parent_documents
 from src.postprocessors import RelativeScoreThresholdPostprocessor
 from src.query_processing import (
     build_multi_retrieval_queries,
@@ -252,6 +256,26 @@ def apply_postprocessors(
     return nodes
 
 
+def _diversify_comprehensive_nodes(
+    nodes: list[NodeWithScore],
+    *,
+    max_per_section: int = 2,
+) -> list[NodeWithScore]:
+    """Cap chunks per section so list questions get heterogeneous rerank input."""
+    buckets: dict[str, list[NodeWithScore]] = {}
+    for node in nodes:
+        meta = node.metadata or {}
+        section = str(meta.get("section_path") or meta.get("section_title") or "unknown")
+        buckets.setdefault(section, []).append(node)
+
+    diversified: list[NodeWithScore] = []
+    for section_nodes in buckets.values():
+        section_nodes.sort(key=lambda n: n.score or 0.0, reverse=True)
+        diversified.extend(section_nodes[:max_per_section])
+    diversified.sort(key=lambda n: n.score or 0.0, reverse=True)
+    return diversified
+
+
 def build_retriever(
     index: VectorStoreIndex | None = None,
     *,
@@ -265,10 +289,10 @@ def build_retriever(
     """
     idx = index or load_index()
     kwargs: dict[str, Any] = {"similarity_top_k": get_initial_top_k()}
-    if filters:
-        kwargs["filters"] = filters
 
     base_retriever = idx.as_retriever(**kwargs)
+    if settings.enable_hybrid_bm25:
+        base_retriever = HybridRetriever(base_retriever)
 
     postprocessors = get_node_postprocessors()
     retriever: Any = base_retriever
@@ -282,7 +306,10 @@ def build_retriever(
     )
 
     if should_rewrite:
-        return _QueryRewritingRetriever(retriever)
+        retriever = _QueryRewritingRetriever(retriever)
+
+    if filters:
+        retriever = ScopeFilteredRetriever(retriever, filters)
 
     return retriever
 
@@ -318,7 +345,19 @@ class _PostprocessingRetriever:
             for sub_query in sub_queries:
                 rewritten = preprocess_query(sub_query)
                 bundle = QueryBundle(query_str=rewritten)
-                for node in self._inner.retrieve(bundle):
+                dense_nodes: list[NodeWithScore] = []
+                if hasattr(self._inner, "_dense"):
+                    dense_nodes = self._inner._dense.retrieve(bundle)
+                else:
+                    dense_nodes = self._inner.retrieve(bundle)
+
+                if settings.enable_hybrid_bm25:
+                    bm25_hits = bm25_nodes_for_query(rewritten)
+                    sub_merged = reciprocal_rank_fusion([dense_nodes, bm25_hits])
+                else:
+                    sub_merged = dense_nodes
+
+                for node in sub_merged:
                     node_id = node.node.node_id
                     score = node.score or 0.0
                     existing = merged.get(node_id)
@@ -327,16 +366,48 @@ class _PostprocessingRetriever:
         if get_current_timing() is not None:
             record_stage("chroma_retrieve", t_chroma["elapsed_ms"])
 
-        nodes = list(merged.values())
+        nodes = _diversify_comprehensive_nodes(list(merged.values()))
         log_retrieval_stage("chroma_retrieved_comprehensive", nodes)
         primary = QueryBundle(query_str=preprocess_query(raw_query))
+        reranker = get_reranker()
+        original_top_n: int | None = None
+        if reranker is not None and hasattr(reranker, "top_n"):
+            original_top_n = reranker.top_n
+            reranker.top_n = max(
+                settings.comprehensive_reranker_top_n,
+                settings.reranker_top_n,
+            )
         with timer("rerank_filter") as t_rerank:
-            filtered = apply_postprocessors(nodes, primary, self._postprocessors)
+            try:
+                filtered = apply_postprocessors(nodes, primary, self._postprocessors)
+            finally:
+                if original_top_n is not None and reranker is not None:
+                    reranker.top_n = original_top_n
+            if not filtered and nodes:
+                rerank_only = [
+                    p
+                    for p in self._postprocessors
+                    if not isinstance(p, RelativeScoreThresholdPostprocessor)
+                ]
+                logger.warning(
+                    "Comprehensive retrieval: score filter removed all %d merged nodes; "
+                    "retrying rerank-only",
+                    len(nodes),
+                )
+                filtered = apply_postprocessors(nodes, primary, rerank_only)
+            if not filtered and nodes:
+                filtered = sorted(
+                    nodes,
+                    key=lambda n: n.score or 0.0,
+                    reverse=True,
+                )
         if get_current_timing() is not None:
             record_stage("rerank_filter", t_rerank["elapsed_ms"])
         top_n = get_final_top_k(comprehensive=True)
         filtered = filtered[:top_n]
         log_retrieval_stage("post_rerank_filter", filtered)
+        filtered = expand_to_parent_documents(filtered)
+        log_retrieval_stage("post_parent_expand", filtered)
         return filtered
 
     def _retrieve_bundle(self, bundle: QueryBundle) -> list[NodeWithScore]:
@@ -350,6 +421,8 @@ class _PostprocessingRetriever:
         if get_current_timing() is not None:
             record_stage("rerank_filter", t_rerank["elapsed_ms"])
         log_retrieval_stage("post_rerank_filter", filtered)
+        filtered = expand_to_parent_documents(filtered)
+        log_retrieval_stage("post_parent_expand", filtered)
         return filtered
 
     async def aretrieve(self, query: str | QueryBundle) -> list[NodeWithScore]:
@@ -431,6 +504,12 @@ def get_retrieval_config_summary() -> dict[str, Any]:
         "enable_query_rewrite": settings.enable_query_rewrite,
         "rerank_min_score_ratio": settings.rerank_min_score_ratio,
         "enable_rerank_score_filter": settings.enable_rerank_score_filter,
+        "enable_hybrid_bm25": settings.enable_hybrid_bm25,
+        "bm25_top_k": settings.bm25_top_k,
+        "hybrid_rrf_k": settings.hybrid_rrf_k,
+        "bm25_corpus_size": get_bm25_corpus_size(),
+        "enable_parent_document_retrieval": settings.enable_parent_document_retrieval,
+        "enable_corpus_scoped_retrieval": settings.enable_corpus_scoped_retrieval,
     }
 
 

@@ -8,6 +8,7 @@ Trade-off (production-rag):
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, List, Optional, Sequence
 
 from llama_index.core import Settings, VectorStoreIndex
@@ -18,10 +19,12 @@ from llama_index.core.base.response.schema import RESPONSE_TYPE
 from llama_index.core.response_synthesizers.base import QueryTextType
 from llama_index.core.schema import NodeWithScore, QueryBundle
 
+from src.code_validation import CodeValidationTrace, apply_code_validation_pipeline
 from src.config import settings
 from src.language import append_language_hint
 from src.prompts import (
     INSUFFICIENT_INFO_MESSAGE,
+    LOW_CONFIDENCE_MESSAGE,
     PARTIAL_ANSWER_MIN_CHARS,
     PARTIAL_ANSWER_PREFIX,
     format_nodes_for_prompt,
@@ -31,6 +34,7 @@ from src.prompts import (
     resolve_grounding_mode,
 )
 from src.citations import log_retrieval_stage, record_generation_sources
+from src.query_processing import is_comprehensive_list_query
 from src.retriever import build_retriever
 from src.timing import get_current_timing, record_stage
 from src.utils import logger, timer
@@ -39,12 +43,35 @@ from src.utils import logger, timer
 _ABSTENTION_MARKERS: tuple[str, ...] = (
     INSUFFICIENT_INFO_MESSAGE,
     "The provided documents do not contain sufficient information",
+    "The provided document does not contain sufficient information",
 )
 
 
 def _format_text_chunks(nodes: Sequence[NodeWithScore]) -> list[str]:
     """One metadata-rich chunk per retrieved node for compact synthesis."""
     return [format_nodes_for_prompt([n]) for n in nodes]
+
+
+@dataclass
+class GenerationTrace:
+    """Full generation trace for eval and debugging."""
+
+    pre_guard_answer: str
+    post_guard_answer: str
+    final_answer: str
+    code_validation: CodeValidationTrace
+    fallback_reason: str = "none"
+
+
+def _finalize_answer(
+    query_str: str,
+    answer: str,
+    nodes: Sequence[NodeWithScore],
+    llm: LLM | None,
+) -> tuple[str, CodeValidationTrace]:
+    guarded = apply_faithfulness_guard(answer, nodes, llm)
+    final, code_trace = apply_code_validation_pipeline(query_str, guarded, nodes, llm)
+    return final, code_trace
 
 
 class GroundedCompactAndRefine(CompactAndRefine):
@@ -75,8 +102,10 @@ class GroundedCompactAndRefine(CompactAndRefine):
             text_chunks=text_chunks,
             **response_kwargs,
         )
-        response_str = normalize_balanced_answer(response_str)
-        response_str = apply_faithfulness_guard(response_str, nodes, self._llm)
+        response_str = normalize_balanced_answer(
+            response_str, query=query.query_str
+        )
+        response_str, _ = _finalize_answer(query_str, response_str, nodes, self._llm)
         additional_source_nodes = additional_source_nodes or []
         source_nodes = list(nodes) + list(additional_source_nodes)
         return self._prepare_response_output(response_str, source_nodes)
@@ -101,8 +130,10 @@ class GroundedCompactAndRefine(CompactAndRefine):
             text_chunks=text_chunks,
             **response_kwargs,
         )
-        response_str = normalize_balanced_answer(response_str)
-        response_str = apply_faithfulness_guard(response_str, nodes, self._llm)
+        response_str = normalize_balanced_answer(
+            response_str, query=query.query_str
+        )
+        response_str, _ = _finalize_answer(query_str, response_str, nodes, self._llm)
         additional_source_nodes = additional_source_nodes or []
         source_nodes = list(nodes) + list(additional_source_nodes)
         return self._prepare_response_output(response_str, source_nodes)
@@ -208,7 +239,7 @@ def _preserve_balanced_partial_answer(answer: str) -> str:
     return _strip_trailing_abstention_suffix(answer.strip())
 
 
-def normalize_balanced_answer(answer: str) -> str:
+def normalize_balanced_answer(answer: str, *, query: str | None = None) -> str:
     """
     Post-process balanced-mode LLM output before the faithfulness guard.
 
@@ -224,6 +255,8 @@ def normalize_balanced_answer(answer: str) -> str:
 
     normalized = _strip_leading_abstention_prefix(normalized)
     normalized = _strip_trailing_abstention_suffix(normalized)
+    if query and is_comprehensive_list_query(query):
+        normalized = _strip_trailing_abstention_suffix(normalized)
     return normalized
 
 
@@ -316,24 +349,47 @@ def generate_grounded_answer_with_trace(
     query: str,
     nodes: Sequence[NodeWithScore],
     llm: LLM | None = None,
-) -> tuple[str, str]:
+) -> GenerationTrace:
     """
-    Run grounded synthesis and return (pre_guard_answer, final_answer).
+    Run grounded synthesis with full trace (guard + code validation).
 
-    Used by evaluation to detect guard-induced abstention regressions.
+    Used by evaluation to detect guard-induced abstention and code fallback regressions.
     """
+    empty_trace = CodeValidationTrace()
     if not nodes:
-        return INSUFFICIENT_INFO_MESSAGE, INSUFFICIENT_INFO_MESSAGE
+        msg = INSUFFICIENT_INFO_MESSAGE
+        return GenerationTrace(
+            pre_guard_answer=msg,
+            post_guard_answer=msg,
+            final_answer=msg,
+            code_validation=empty_trace,
+            fallback_reason="none",
+        )
 
     synth = build_grounded_response_synthesizer(llm)
+    judge_llm = llm or synth._llm
     text_chunks = _format_text_chunks(nodes)
     with timer("generation") as t_gen:
         pre_guard = synth.get_response(query_str=query, text_chunks=text_chunks)
     if get_current_timing() is not None:
         record_stage("generation", t_gen["elapsed_ms"])
-    normalized = normalize_balanced_answer(pre_guard)
-    final = apply_faithfulness_guard(normalized, nodes, llm or synth._llm)
-    return pre_guard, final
+    normalized = normalize_balanced_answer(pre_guard, query=query)
+    post_guard = apply_faithfulness_guard(normalized, nodes, judge_llm)
+    final, code_trace = apply_code_validation_pipeline(query, post_guard, nodes, judge_llm)
+
+    fallback_reason = "none"
+    if final == LOW_CONFIDENCE_MESSAGE:
+        fallback_reason = "code_validation"
+    elif final == INSUFFICIENT_INFO_MESSAGE and post_guard != INSUFFICIENT_INFO_MESSAGE:
+        fallback_reason = "faithfulness"
+
+    return GenerationTrace(
+        pre_guard_answer=pre_guard,
+        post_guard_answer=post_guard,
+        final_answer=final,
+        code_validation=code_trace,
+        fallback_reason=fallback_reason,
+    )
 
 
 class SourceTrackingQueryEngine:

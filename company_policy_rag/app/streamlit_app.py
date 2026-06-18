@@ -48,7 +48,7 @@ from src.indexing import (
     reset_chroma_client_cache,
 )
 from src.memory import create_session_memory, memory_stats
-from src.prompts import resolve_grounding_mode
+from src.prompts import LOW_CONFIDENCE_MESSAGE, resolve_grounding_mode
 from src.retriever import build_retriever
 from src.utils import (
     format_citation_excerpt,
@@ -625,6 +625,11 @@ def main() -> None:
                     citations = []
 
             st.markdown(answer)
+            if LOW_CONFIDENCE_MESSAGE in answer:
+                st.info(
+                    "This answer could not be fully verified against retrieved sources. "
+                    "Review the cited excerpts below or ask a more specific question."
+                )
             if settings.show_citations and citations:
                 _render_sources(citations)
 

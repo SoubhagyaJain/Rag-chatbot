@@ -2,7 +2,8 @@
 
 > **README2** documents the full build-and-tune story of `company_policy_rag`: what we tried, what broke, what we fixed, and how metrics moved. Written for engineers who want to understand *why* each decision was made — not just what the code does.
 
-For day-to-day setup and API reference, see [README.md](README.md).
+For day-to-day setup and API reference, see [README.md](README.md).  
+For **current completion status and prioritized backlog**, see [README3.md](README3.md).
 
 ---
 

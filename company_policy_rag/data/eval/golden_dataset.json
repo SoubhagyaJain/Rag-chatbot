@@ -1,126 +1,984 @@
 {
-  "version": "1.0",
-  "description": "Golden evaluation set for company policy RAG. relevant_sections are matched fuzzily against retrieved chunk metadata and text. Update cases as your corpus grows.",
+  "version": "2.0",
+  "description": "Golden evaluation set v2: policy handbook + AI Agents guidebook (code, patterns, workflows).",
   "cases": [
     {
       "id": "vacation_accrual",
+      "corpus": "policy",
+      "query_type": "factual",
       "category": "factual",
       "question": "What is the policy on vacation accrual for full-time employees?",
-      "expected_answer": "Should describe how vacation/PTO accrues (rate, eligibility, waiting period if any).",
-      "relevant_sections": ["vacation", "leave", "PTO", "paid time off", "time off"],
-      "expected_key_points": ["accrual", "full-time", "vacation", "days"]
+      "expected_answer": "Should describe how vacation/PTO accrues.",
+      "relevant_sections": [
+        "vacation",
+        "leave",
+        "PTO"
+      ],
+      "expected_key_points": [
+        "accrual",
+        "full-time",
+        "vacation"
+      ]
     },
     {
       "id": "harassment_rules",
+      "corpus": "policy",
+      "query_type": "policy_interpretation",
       "category": "policy_interpretation",
       "question": "Explain the rules around harassment in the workplace.",
-      "expected_answer": "Should state that harassment is prohibited, define or reference types, and mention reporting or zero-tolerance.",
-      "relevant_sections": ["harassment", "discrimination", "equal employment", "workplace conduct"],
-      "expected_key_points": ["prohibited", "harassment", "report"]
+      "expected_answer": "Should state harassment is prohibited.",
+      "relevant_sections": [
+        "harassment",
+        "discrimination"
+      ],
+      "expected_key_points": [
+        "prohibited",
+        "harassment"
+      ]
     },
     {
       "id": "notice_resignation",
+      "corpus": "policy",
+      "query_type": "edge_case",
       "category": "edge_case",
-      "question": "What happens if I don't give notice when resigning?",
-      "expected_answer": "Should explain notice expectations and consequences of failing to provide notice (if covered).",
-      "relevant_sections": ["resignation", "employment at-will", "at-will", "termination", "separation"],
-      "expected_key_points": ["notice", "resign", "two weeks"]
+      "question": "What happens if I do not give notice when resigning?",
+      "expected_answer": "Should explain notice and at-will.",
+      "relevant_sections": [
+        "resignation",
+        "at-will",
+        "termination"
+      ],
+      "expected_key_points": [
+        "notice",
+        "resign"
+      ]
     },
     {
       "id": "remote_work",
+      "corpus": "policy",
+      "query_type": "factual",
       "category": "factual",
       "question": "What is the remote work or telecommuting policy?",
-      "expected_answer": "Should cover whether remote work is allowed, approval process, or expectations.",
-      "relevant_sections": ["remote", "telecommut", "work from home", "flexible work"],
-      "expected_key_points": ["remote", "work"]
+      "expected_answer": "Should cover remote work rules.",
+      "relevant_sections": [
+        "remote",
+        "telecommut"
+      ],
+      "expected_key_points": [
+        "remote",
+        "work"
+      ]
     },
     {
       "id": "sick_leave",
+      "corpus": "policy",
+      "query_type": "factual",
       "category": "factual",
       "question": "How many sick days do employees receive and how are they used?",
-      "expected_answer": "Should describe sick leave allocation, eligibility, and usage rules.",
-      "relevant_sections": ["sick", "illness", "medical leave", "leave of absence"],
-      "expected_key_points": ["sick", "leave", "days"]
+      "expected_answer": "Should describe sick leave.",
+      "relevant_sections": [
+        "sick",
+        "illness",
+        "medical leave"
+      ],
+      "expected_key_points": [
+        "sick",
+        "leave"
+      ]
     },
     {
       "id": "dress_code",
+      "corpus": "policy",
+      "query_type": "factual",
       "category": "factual",
       "question": "What is the dress code policy?",
-      "expected_answer": "Should describe expected attire or grooming standards.",
-      "relevant_sections": ["dress code", "appearance", "attire", "grooming"],
-      "expected_key_points": ["dress", "attire"]
+      "expected_answer": "Should describe attire standards.",
+      "relevant_sections": [
+        "dress code",
+        "appearance"
+      ],
+      "expected_key_points": [
+        "dress",
+        "attire"
+      ]
     },
     {
       "id": "overtime_pay",
+      "corpus": "policy",
+      "query_type": "factual",
       "category": "factual",
       "question": "Who is eligible for overtime pay and how is it calculated?",
-      "expected_answer": "Should explain overtime eligibility, exempt vs non-exempt if applicable, and rate.",
-      "relevant_sections": ["overtime", "wage", "hours", "compensation", "FLSA"],
-      "expected_key_points": ["overtime", "hour", "pay"]
+      "expected_answer": "Should explain overtime eligibility.",
+      "relevant_sections": [
+        "overtime",
+        "wage",
+        "hours"
+      ],
+      "expected_key_points": [
+        "overtime",
+        "pay"
+      ]
     },
     {
       "id": "confidentiality",
+      "corpus": "policy",
+      "query_type": "policy_interpretation",
       "category": "policy_interpretation",
       "question": "What are my confidentiality obligations as an employee?",
-      "expected_answer": "Should cover protection of company information, trade secrets, or proprietary data.",
-      "relevant_sections": ["confidential", "proprietary", "trade secret", "non-disclosure"],
-      "expected_key_points": ["confidential", "information"]
+      "expected_answer": "Should cover confidential information.",
+      "relevant_sections": [
+        "confidential",
+        "proprietary"
+      ],
+      "expected_key_points": [
+        "confidential"
+      ]
     },
     {
       "id": "benefits_eligibility",
+      "corpus": "policy",
+      "query_type": "factual",
       "category": "multi_part",
-      "question": "When do new employees become eligible for health benefits and other benefits?",
-      "expected_answer": "Should mention waiting period, enrollment, and types of benefits offered.",
-      "relevant_sections": ["benefits", "health", "insurance", "eligibility", "enrollment"],
-      "expected_key_points": ["benefits", "eligible", "enroll"]
+      "question": "When do new employees become eligible for health benefits?",
+      "expected_answer": "Should mention waiting period and enrollment.",
+      "relevant_sections": [
+        "benefits",
+        "health",
+        "insurance"
+      ],
+      "expected_key_points": [
+        "benefits",
+        "eligible"
+      ]
     },
     {
       "id": "disciplinary_process",
+      "corpus": "policy",
+      "query_type": "policy_interpretation",
       "category": "policy_interpretation",
       "question": "What is the disciplinary process for policy violations?",
-      "expected_answer": "Should describe progressive discipline steps or at-will termination rights.",
-      "relevant_sections": ["discipline", "disciplinary", "corrective action", "termination", "violation"],
-      "expected_key_points": ["discipline", "violation"]
+      "expected_answer": "Should describe discipline steps.",
+      "relevant_sections": [
+        "discipline",
+        "disciplinary",
+        "termination"
+      ],
+      "expected_key_points": [
+        "discipline"
+      ]
     },
     {
       "id": "equal_opportunity",
+      "corpus": "policy",
+      "query_type": "factual",
       "category": "factual",
-      "question": "What is the company's equal employment opportunity policy?",
-      "expected_answer": "Should state commitment to equal opportunity and non-discrimination.",
-      "relevant_sections": ["equal employment", "EEO", "non-discrimination", "discrimination", "opportunity"],
-      "expected_key_points": ["equal", "discriminat"]
+      "question": "What is the company equal employment opportunity policy?",
+      "expected_answer": "Should state EEO commitment.",
+      "relevant_sections": [
+        "equal employment",
+        "EEO",
+        "non-discrimination"
+      ],
+      "expected_key_points": [
+        "equal",
+        "discriminat"
+      ]
     },
     {
       "id": "social_media",
+      "corpus": "policy",
+      "query_type": "edge_case",
       "category": "edge_case",
       "question": "Are there restrictions on employee social media use related to the company?",
-      "expected_answer": "Should address social media guidelines, representing the company, or confidentiality online.",
-      "relevant_sections": ["social media", "internet", "electronic communication", "online"],
-      "expected_key_points": ["social", "media"]
+      "expected_answer": "Should address online conduct.",
+      "relevant_sections": [
+        "social media",
+        "internet",
+        "electronic communication"
+      ],
+      "expected_key_points": [
+        "social"
+      ]
     },
     {
       "id": "jury_duty",
+      "corpus": "policy",
+      "query_type": "factual",
       "category": "factual",
       "question": "What is the policy for jury duty or civic leave?",
-      "expected_answer": "Should explain time off for jury duty or civic obligations and whether paid.",
-      "relevant_sections": ["jury", "civic", "court", "subpoena", "leave"],
-      "expected_key_points": ["jury", "leave"]
+      "expected_answer": "Should explain jury duty leave.",
+      "relevant_sections": [
+        "jury",
+        "civic",
+        "court"
+      ],
+      "expected_key_points": [
+        "jury",
+        "leave"
+      ]
     },
     {
       "id": "outside_employment",
+      "corpus": "policy",
+      "query_type": "factual",
       "category": "multi_part",
       "question": "Can I work a second job or do outside consulting while employed here?",
-      "expected_answer": "Should address outside employment, conflicts of interest, and approval requirements.",
-      "relevant_sections": ["outside employment", "moonlight", "conflict of interest", "second job"],
-      "expected_key_points": ["outside", "conflict", "employment"]
+      "expected_answer": "Should address outside employment.",
+      "relevant_sections": [
+        "outside employment",
+        "conflict of interest"
+      ],
+      "expected_key_points": [
+        "outside",
+        "conflict"
+      ]
     },
     {
       "id": "not_in_handbook",
+      "corpus": "policy",
+      "query_type": "edge_case",
       "category": "edge_case",
-      "question": "What is the company's policy on pet insurance reimbursement?",
-      "expected_answer": "Should indicate insufficient information or that pet insurance is not covered if absent from docs.",
-      "relevant_sections": [],
-      "expected_key_points": ["not", "insufficient", "no information", "do not have"]
+      "question": "What is the company policy on pet insurance reimbursement?",
+      "expected_answer": "Should indicate insufficient information.",
+      "relevant_sections": [
+        ""
+      ],
+      "expected_key_points": [
+        "not",
+        "insufficient"
+      ]
+    },
+    {
+      "id": "smoking_policy",
+      "corpus": "policy",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "What is the smoking policy in the workplace?",
+      "expected_answer": "Should describe smoking restrictions.",
+      "relevant_sections": [
+        "smoking",
+        "tobacco",
+        "smoke"
+      ],
+      "expected_key_points": [
+        "smoking"
+      ]
+    },
+    {
+      "id": "drug_alcohol",
+      "corpus": "policy",
+      "query_type": "policy_interpretation",
+      "category": "policy_interpretation",
+      "question": "What is the drug and alcohol policy for employees?",
+      "expected_answer": "Should prohibit impairment at work.",
+      "relevant_sections": [
+        "drug",
+        "alcohol",
+        "substance"
+      ],
+      "expected_key_points": [
+        "drug",
+        "alcohol"
+      ]
+    },
+    {
+      "id": "bereavement_leave",
+      "corpus": "policy",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "Is bereavement or funeral leave provided to employees?",
+      "expected_answer": "Should describe bereavement leave if covered.",
+      "relevant_sections": [
+        "bereavement",
+        "funeral",
+        "death"
+      ],
+      "expected_key_points": [
+        "bereavement",
+        "leave"
+      ]
+    },
+    {
+      "id": "performance_review",
+      "corpus": "policy",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "How are performance reviews conducted?",
+      "expected_answer": "Should describe evaluation process.",
+      "relevant_sections": [
+        "performance",
+        "evaluation",
+        "review"
+      ],
+      "expected_key_points": [
+        "performance",
+        "review"
+      ]
+    },
+    {
+      "id": "expense_reimbursement",
+      "corpus": "policy",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "What is the expense reimbursement policy?",
+      "expected_answer": "Should explain reimbursable expenses.",
+      "relevant_sections": [
+        "expense",
+        "reimburse",
+        "travel"
+      ],
+      "expected_key_points": [
+        "expense"
+      ]
+    },
+    {
+      "id": "workplace_violence",
+      "corpus": "policy",
+      "query_type": "policy_interpretation",
+      "category": "policy_interpretation",
+      "question": "What is the policy on workplace violence?",
+      "expected_answer": "Should prohibit violence and threats.",
+      "relevant_sections": [
+        "violence",
+        "threat",
+        "workplace safety"
+      ],
+      "expected_key_points": [
+        "violence"
+      ]
+    },
+    {
+      "id": "ada_accommodation",
+      "corpus": "policy",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "How does the company handle ADA accommodation requests?",
+      "expected_answer": "Should mention reasonable accommodation.",
+      "relevant_sections": [
+        "ADA",
+        "accommodation",
+        "disability"
+      ],
+      "expected_key_points": [
+        "accommodation"
+      ]
+    },
+    {
+      "id": "whistleblower",
+      "corpus": "policy",
+      "query_type": "policy_interpretation",
+      "category": "policy_interpretation",
+      "question": "Is there a whistleblower or non-retaliation policy?",
+      "expected_answer": "Should address reporting without retaliation.",
+      "relevant_sections": [
+        "whistleblower",
+        "retaliation",
+        "report"
+      ],
+      "expected_key_points": [
+        "retaliation"
+      ]
+    },
+    {
+      "id": "intellectual_property",
+      "corpus": "policy",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "Who owns intellectual property created by employees?",
+      "expected_answer": "Should address IP ownership.",
+      "relevant_sections": [
+        "intellectual property",
+        "invention",
+        "copyright"
+      ],
+      "expected_key_points": [
+        "intellectual",
+        "property"
+      ]
+    },
+    {
+      "id": "paid_holidays",
+      "corpus": "policy",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "What paid holidays does the company observe?",
+      "expected_answer": "Should list observed holidays.",
+      "relevant_sections": [
+        "holiday",
+        "paid holiday",
+        "observed"
+      ],
+      "expected_key_points": [
+        "holiday"
+      ]
+    },
+    {
+      "id": "agent_vs_llm_vs_rag",
+      "corpus": "guidebook",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "What is the difference between an Agent, an LLM, and RAG?",
+      "expected_answer": "Should contrast agent autonomy, LLM response, and retrieval.",
+      "relevant_sections": [
+        "Agent vs LLM vs RAG",
+        "agent",
+        "RAG"
+      ],
+      "expected_key_points": [
+        "agent",
+        "LLM",
+        "RAG"
+      ]
+    },
+    {
+      "id": "six_building_blocks",
+      "corpus": "guidebook",
+      "query_type": "enumeration",
+      "category": "enumeration",
+      "question": "List and explain the 6 building blocks of AI Agents.",
+      "expected_answer": "Should list all six blocks from the guidebook.",
+      "relevant_sections": [
+        "building blocks",
+        "Role",
+        "Tools",
+        "Memory",
+        "Guardrails",
+        "Planning"
+      ],
+      "expected_key_points": [
+        "building",
+        "block",
+        "tools",
+        "memory"
+      ]
+    },
+    {
+      "id": "role_playing_block",
+      "corpus": "guidebook",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "What is the Role-playing building block in AI agents?",
+      "expected_answer": "Should explain role/task description for agents.",
+      "relevant_sections": [
+        "Role",
+        "role-playing",
+        "task description"
+      ],
+      "expected_key_points": [
+        "role"
+      ]
+    },
+    {
+      "id": "tools_block",
+      "corpus": "guidebook",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "What role do Tools play in AI agents?",
+      "expected_answer": "Should explain tools extend agent capabilities.",
+      "relevant_sections": [
+        "Tools allow",
+        "custom tool",
+        "tool"
+      ],
+      "expected_key_points": [
+        "tools"
+      ]
+    },
+    {
+      "id": "memory_block",
+      "corpus": "guidebook",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "How does Memory work as a building block of AI agents?",
+      "expected_answer": "Should explain short/long-term memory.",
+      "relevant_sections": [
+        "Memory",
+        "memory"
+      ],
+      "expected_key_points": [
+        "memory"
+      ]
+    },
+    {
+      "id": "guardrails_block",
+      "corpus": "guidebook",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "What are Guardrails in AI agents and why are they used?",
+      "expected_answer": "Should explain safety/constraint guardrails.",
+      "relevant_sections": [
+        "Guardrails",
+        "guardrail"
+      ],
+      "expected_key_points": [
+        "guardrail"
+      ]
+    },
+    {
+      "id": "planning_block",
+      "corpus": "guidebook",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "What is the Planning building block in AI agents?",
+      "expected_answer": "Should explain planning/decomposition.",
+      "relevant_sections": [
+        "Planning",
+        "planning"
+      ],
+      "expected_key_points": [
+        "planning"
+      ]
+    },
+    {
+      "id": "mcp_tools",
+      "corpus": "guidebook",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "What is MCP in the context of agent tools?",
+      "expected_answer": "Should explain MCP only as defined in the document.",
+      "relevant_sections": [
+        "MCP"
+      ],
+      "expected_key_points": [
+        "MCP"
+      ]
+    },
+    {
+      "id": "currency_tool_example",
+      "corpus": "guidebook",
+      "query_type": "code",
+      "category": "code",
+      "question": "Show the currency conversion tool example and explain how it is invoked.",
+      "expected_answer": "Should reference the real-time currency tool code example.",
+      "relevant_sections": [
+        "currency",
+        "conversion",
+        "tool"
+      ],
+      "expected_key_points": [
+        "currency",
+        "tool"
+      ]
+    },
+    {
+      "id": "custom_tools",
+      "corpus": "guidebook",
+      "query_type": "code",
+      "category": "code",
+      "question": "How do you build custom tools for an agent?",
+      "expected_answer": "Should describe custom tool creation with code.",
+      "relevant_sections": [
+        "custom tool",
+        "Tools allow"
+      ],
+      "expected_key_points": [
+        "custom",
+        "tool"
+      ]
+    },
+    {
+      "id": "react_pattern",
+      "corpus": "guidebook",
+      "query_type": "pattern",
+      "category": "pattern",
+      "question": "Explain the ReAct design pattern for AI agents.",
+      "expected_answer": "Should explain reasoning + acting loop.",
+      "relevant_sections": [
+        "ReAct",
+        "reasoning",
+        "acting"
+      ],
+      "expected_key_points": [
+        "ReAct"
+      ]
+    },
+    {
+      "id": "reflection_pattern",
+      "corpus": "guidebook",
+      "query_type": "pattern",
+      "category": "pattern",
+      "question": "How does reflection help agents improve their output?",
+      "expected_answer": "Should explain self-review iteration.",
+      "relevant_sections": [
+        "reviews its own work",
+        "reflection",
+        "iterate"
+      ],
+      "expected_key_points": [
+        "reflection",
+        "review"
+      ]
+    },
+    {
+      "id": "multi_agent_orchestration",
+      "corpus": "guidebook",
+      "query_type": "workflow",
+      "category": "workflow",
+      "question": "What is multi-agent orchestration in the guidebook?",
+      "expected_answer": "Should explain coordinating multiple agents.",
+      "relevant_sections": [
+        "multi-agent",
+        "orchestrat",
+        "manager agent"
+      ],
+      "expected_key_points": [
+        "multi-agent",
+        "orchestr"
+      ]
+    },
+    {
+      "id": "manager_agent",
+      "corpus": "guidebook",
+      "query_type": "workflow",
+      "category": "workflow",
+      "question": "What does a manager agent do in a multi-agent setup?",
+      "expected_answer": "Should explain coordination of sub-agents.",
+      "relevant_sections": [
+        "manager agent",
+        "sub-agent",
+        "coordinates"
+      ],
+      "expected_key_points": [
+        "manager",
+        "agent"
+      ]
+    },
+    {
+      "id": "rag_in_agent",
+      "corpus": "guidebook",
+      "query_type": "workflow",
+      "category": "workflow",
+      "question": "How is RAG used inside an agent workflow?",
+      "expected_answer": "Should explain retrieval step in agent.",
+      "relevant_sections": [
+        "retrieves the relevant context",
+        "RAG",
+        "retrieval"
+      ],
+      "expected_key_points": [
+        "RAG",
+        "retriev"
+      ]
+    },
+    {
+      "id": "guardrails_examples",
+      "corpus": "guidebook",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "Give examples of useful guardrails for agents.",
+      "expected_answer": "Should list guardrail examples from text.",
+      "relevant_sections": [
+        "Examples of useful guardrails",
+        "guardrail"
+      ],
+      "expected_key_points": [
+        "guardrail"
+      ]
+    },
+    {
+      "id": "tool_gathering_info",
+      "corpus": "guidebook",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "How do tools help LLMs gather more information?",
+      "expected_answer": "Should explain tool-based information gathering.",
+      "relevant_sections": [
+        "gather more information",
+        "Tools allow LLMs"
+      ],
+      "expected_key_points": [
+        "tool",
+        "information"
+      ]
+    },
+    {
+      "id": "design_patterns_popular",
+      "corpus": "guidebook",
+      "query_type": "enumeration",
+      "category": "enumeration",
+      "question": "What are the most popular agent design patterns mentioned?",
+      "expected_answer": "Should list design patterns like ReAct.",
+      "relevant_sections": [
+        "design patterns",
+        "ReAct",
+        "popular"
+      ],
+      "expected_key_points": [
+        "pattern",
+        "ReAct"
+      ]
+    },
+    {
+      "id": "research_agent",
+      "corpus": "guidebook",
+      "query_type": "workflow",
+      "category": "workflow",
+      "question": "What does the research agent example do?",
+      "expected_answer": "Should explain autonomous search/retrieval.",
+      "relevant_sections": [
+        "Research Agent",
+        "searches",
+        "retrieves"
+      ],
+      "expected_key_points": [
+        "research",
+        "agent"
+      ]
+    },
+    {
+      "id": "agent_task_description",
+      "corpus": "guidebook",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "Why do agents need a clear task description?",
+      "expected_answer": "Should explain task/role prompting.",
+      "relevant_sections": [
+        "task description",
+        "We give the agent"
+      ],
+      "expected_key_points": [
+        "task",
+        "description"
+      ]
+    },
+    {
+      "id": "code_available_links",
+      "corpus": "guidebook",
+      "query_type": "code",
+      "category": "code",
+      "question": "Where does the guidebook point readers for full code examples?",
+      "expected_answer": "Should mention code availability links.",
+      "relevant_sections": [
+        "code is available",
+        "Check this code"
+      ],
+      "expected_key_points": [
+        "code",
+        "available"
+      ]
+    },
+    {
+      "id": "tech_stack_agents",
+      "corpus": "guidebook",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "What tech stack is mentioned for building agents?",
+      "expected_answer": "Should list frameworks/libraries cited.",
+      "relevant_sections": [
+        "Tech stack",
+        "LangChain",
+        "LlamaIndex"
+      ],
+      "expected_key_points": [
+        "tech",
+        "stack"
+      ]
+    },
+    {
+      "id": "orchestration_vs_single",
+      "corpus": "guidebook",
+      "query_type": "pattern",
+      "category": "pattern",
+      "question": "When is orchestration preferred over a single agent?",
+      "expected_answer": "Should compare multi-agent vs single agent.",
+      "relevant_sections": [
+        "orchestrat",
+        "manager",
+        "sub-agent"
+      ],
+      "expected_key_points": [
+        "orchestrat"
+      ]
+    },
+    {
+      "id": "tool_vs_plain_llm",
+      "corpus": "guidebook",
+      "query_type": "pattern",
+      "category": "pattern",
+      "question": "Why use an agent with tools instead of a plain LLM responder?",
+      "expected_answer": "Should contrast generic responder vs tools.",
+      "relevant_sections": [
+        "generic responder",
+        "Tools allow"
+      ],
+      "expected_key_points": [
+        "tool",
+        "LLM"
+      ]
+    },
+    {
+      "id": "memory_short_long",
+      "corpus": "guidebook",
+      "query_type": "enumeration",
+      "category": "enumeration",
+      "question": "What types of memory do agents use?",
+      "expected_answer": "Should describe memory categories.",
+      "relevant_sections": [
+        "Memory",
+        "short",
+        "long"
+      ],
+      "expected_key_points": [
+        "memory"
+      ]
+    },
+    {
+      "id": "abstention_quantum",
+      "corpus": "guidebook",
+      "query_type": "edge_case",
+      "category": "edge_case",
+      "question": "What does the guidebook say about quantum error correction for agents?",
+      "expected_answer": "Should abstain \u2014 topic not in document.",
+      "relevant_sections": [
+        ""
+      ],
+      "expected_key_points": [
+        "insufficient",
+        "not"
+      ]
+    },
+    {
+      "id": "abstention_company_vacation",
+      "corpus": "guidebook",
+      "query_type": "edge_case",
+      "category": "edge_case",
+      "question": "How many vacation days do nonprofit employees accrue per the AI Agents guidebook?",
+      "expected_answer": "Should abstain \u2014 handbook topic not in guidebook.",
+      "relevant_sections": [
+        ""
+      ],
+      "expected_key_points": [
+        "not",
+        "insufficient"
+      ]
+    },
+    {
+      "id": "enumeration_subagents",
+      "corpus": "guidebook",
+      "query_type": "enumeration",
+      "category": "enumeration",
+      "question": "What roles can sub-agents play in orchestration?",
+      "expected_answer": "Should describe sub-agent specialization.",
+      "relevant_sections": [
+        "sub-agent",
+        "manager",
+        "specialist"
+      ],
+      "expected_key_points": [
+        "sub-agent"
+      ]
+    },
+    {
+      "id": "workflow_retrieval_step",
+      "corpus": "guidebook",
+      "query_type": "workflow",
+      "category": "workflow",
+      "question": "What is the retrieval step in the agent workflow example?",
+      "expected_answer": "Should explain context retrieval from user query.",
+      "relevant_sections": [
+        "retrieves the relevant context",
+        "user query"
+      ],
+      "expected_key_points": [
+        "retriev",
+        "context"
+      ]
+    },
+    {
+      "id": "pattern_plan_execute",
+      "corpus": "guidebook",
+      "query_type": "pattern",
+      "category": "pattern",
+      "question": "Is plan-and-execute discussed as an agent pattern?",
+      "expected_answer": "Should address planning patterns if present.",
+      "relevant_sections": [
+        "planning",
+        "plan",
+        "execute"
+      ],
+      "expected_key_points": [
+        "plan"
+      ]
+    },
+    {
+      "id": "code_check_this_out",
+      "corpus": "guidebook",
+      "query_type": "code",
+      "category": "code",
+      "question": "What code walkthroughs does the guidebook highlight with Check this out?",
+      "expected_answer": "Should reference highlighted code sections.",
+      "relevant_sections": [
+        "Check this out",
+        "code"
+      ],
+      "expected_key_points": [
+        "code"
+      ]
+    },
+    {
+      "id": "tools_real_world",
+      "corpus": "guidebook",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "What real-world capability does the currency tool demonstrate?",
+      "expected_answer": "Should explain real-time currency conversion tool.",
+      "relevant_sections": [
+        "real-time currency",
+        "conversion"
+      ],
+      "expected_key_points": [
+        "currency"
+      ]
+    },
+    {
+      "id": "agent_building_blocks_count",
+      "corpus": "guidebook",
+      "query_type": "enumeration",
+      "category": "enumeration",
+      "question": "How many building blocks of AI agents does the guidebook describe?",
+      "expected_answer": "Should state six building blocks.",
+      "relevant_sections": [
+        "6",
+        "six",
+        "building blocks"
+      ],
+      "expected_key_points": [
+        "six",
+        "6"
+      ]
+    },
+    {
+      "id": "rag_vs_agent_autonomy",
+      "corpus": "guidebook",
+      "query_type": "pattern",
+      "category": "pattern",
+      "question": "How does agent autonomy differ from a standalone RAG pipeline?",
+      "expected_answer": "Should contrast autonomous agent behavior.",
+      "relevant_sections": [
+        "autonomously",
+        "Agent vs",
+        "RAG"
+      ],
+      "expected_key_points": [
+        "autonom",
+        "RAG"
+      ]
+    },
+    {
+      "id": "critic_planner_mention",
+      "corpus": "guidebook",
+      "query_type": "workflow",
+      "category": "workflow",
+      "question": "Does the guidebook mention planner or critic agents?",
+      "expected_answer": "Should faithfully report if planner/critic appear.",
+      "relevant_sections": [
+        "planner",
+        "critic"
+      ],
+      "expected_key_points": [
+        "planner",
+        "critic"
+      ]
     }
   ]
 }

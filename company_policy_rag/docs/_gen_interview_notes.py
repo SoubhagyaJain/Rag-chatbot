@@ -59,9 +59,9 @@ def add_qs(cat, items):
 add_qs("opening", [
     ("Walk me through this project in 60 seconds.", "Tests communication clarity and whether you lead with impact or buzzwords.",
      ["Employees need handbook answers they can trust — not confident hallucinations.",
-      "I built an eval-driven RAG: index PDFs → retrieve with reranker → grounded generation → faithfulness guard → citation-filtered UI.",
-      "As solo AI/ML engineer I owned pipeline, eval harness, UI, Docker, and 94 tests.",
-      "Recovered answer relevancy 0.40→0.747 (+87%) on a 15-case golden set while measuring the faithfulness/helpfulness trade-off explicitly."],
+      "I built an eval-driven RAG: dual-corpus index (308 chunks) → hybrid BM25+dense → rerank → grounded generation → faithfulness guard → code validation → citation-filtered UI.",
+      "As solo AI/ML engineer I owned pipeline, eval harness, UI, Docker, and 180 tests.",
+      "Policy: relevancy 0.40→0.747 (+87%) on 15-case set (run 104356). Guidebook: full rel 0.700 (run 164848, gate passed); enumeration rel 0.84—measured faithfulness/helpfulness trade-off explicitly."],
      "README2.md, src/evaluation.py", ["What would you do differently?", "Biggest failure?"], "opening"),
     ("Why is this relevant to Anthropic's work?", "Checks alignment with helpful, harmless, honest systems — not just demo RAG.",
      ["Anthropic cares about trade-offs between helpfulness and harmlessness; I measured the analog: relevancy vs faithfulness.",
@@ -81,10 +81,10 @@ add_qs("opening", [
       "Result: 0.747 relevancy; documented trade-off (faith 0.807)."],
      "generation.py apply_faithfulness_guard, README2 Act 3", ["How did you detect it?", "What guardrails prevent recurrence?"], "opening"),
     ("What would you put on a Claude system card for this?", "Tests safety documentation thinking.",
-     ["Intended use: internal HR policy Q&A on indexed handbooks.",
-      "Failure modes: unsupported claims, over-abstention, wrong citation sources, vocabulary mismatch.",
-      "Mitigations: faithfulness guard, mandatory [Source N], balanced vs strict modes, eval harness.",
-      "Known limits: 7B local model, no BM25, single PDF corpus, faithfulness 0.807 vs 0.90 target."],
+     ["Intended use: internal HR policy + AI guidebook Q&A on indexed PDFs.",
+      "Failure modes: unsupported claims, over-abstention, wrong citation sources, vocabulary mismatch, incomplete enumeration lists, code hallucination.",
+      "Mitigations: faithfulness guard, mandatory [Source N], balanced vs strict modes, hybrid BM25, corpus scoping, code validation pipeline, eval harness.",
+      "Known limits: 7B local model; guidebook faithfulness 0.629 vs 0.90 target; code-query rel 0.525 on full guidebook run; policy faithfulness 0.807 vs 0.90; CPU e2e p50 53.5s."],
      "prompts.py, generation.py, README.md limitations", ["Residual risk?", "Human escalation path?"], "opening"),
 ])
 
@@ -107,15 +107,27 @@ add_qs("retrieval", [
      "query_processing.py augment_query_with_policy_terms", ["Why not HyDE?", "Embedding fine-tune?"], "retrieval"),
     ("Explain your chunking strategy.", "Indexing decisions for legal text.",
      ["640 tokens, 64 overlap — section-aware SentenceSplitter.",
-      "section_path + page_number metadata on every chunk.",
+      "section_path + page_number + content_type metadata on every chunk.",
       "Incremental SHA-256 file_hash indexing into Chroma.",
-      "81 chunks on handbook PDF."],
+      "308 chunks: 80 policy handbook + 228 AI Agents guidebook (0% unknown section_path post-reindex)."],
      "indexing.py get_node_parser, enrich_nodes_with_sections", ["Chunk size ablation?", "Multi-doc?"], "retrieval"),
     ("What is context precision vs hit rate?", "Metric literacy.",
-     ["Hit rate: any relevant chunk in top-k (0.87 stable).",
+     ["Hit rate: any relevant chunk in top-k (0.87 stable on policy; 1.00 on enum subset 160052).",
       "Context precision: relevant_retrieved / total_retrieved — measures noise in LLM context.",
-      "Low precision was the bottleneck, not recall."],
+      "Low precision was the bottleneck on policy; enumeration completeness was guidebook bottleneck."],
      "evaluation.py compute_retrieval_metrics", ["Context recall formula?", "NDCG?"], "retrieval"),
+    ("How do you handle enumeration and comprehensive-list questions?", "List completeness is a distinct failure mode from single-fact QA.",
+     ["is_comprehensive_list_query() + augment_query_with_guidebook_terms() for named subqueries.",
+      "Multi-query retrieval, section-diverse rerank, top_n=12 for comprehensive path.",
+      "Enumeration few-shots (Examples M–O) + rules 16b/16c in prompts.py.",
+      "Run 164848: full guidebook rel 0.700 (gate passed); enumeration bucket rel 0.84, hit 1.00."],
+     "query_processing.py, retriever.py, prompts.py", ["Why multi-query retrieval?", "How do you measure list completeness?"], "retrieval"),
+    ("What is cross-corpus bleed and how did you fix it?", "Multi-corpus RAG pitfall — tests retrieval scoping design.",
+     ["Shared Chroma collection indexed policy + guidebook; dense retrieval returned handbook chunks for guidebook questions.",
+      "Symptom: role_playing_block, planning_block retrieved HR policy sections.",
+      "Fix: retrieval_scope.py post-filters by source_file from eval case corpus metadata.",
+      "Eval scoped with --corpus guidebook; handbook bleed eliminated on scoped cases."],
+     "retrieval_scope.py, golden_dataset_guidebook.json", ["When would you disable corpus scoping?", "Eval signal for bleed?"], "retrieval"),
 ])
 
 add_qs("prompts", [
@@ -153,6 +165,12 @@ add_qs("prompts", [
       "Adequate for policy Q&A; complex multi-doc reasoning would need larger model.",
       "Same model for gen + eval judge — note independence limitation."],
      "config.py OLLAMA_MODEL", ["Judge contamination?", "Claude as judge only?"], "prompts"),
+    ("Walk me through post-generation code validation.", "Code-heavy RAG needs verifiable outputs, not just prose grounding.",
+     ["After faithfulness guard: code_validation.py checks generated code lines against retrieved context.",
+      "Heuristic + LLM judge; self-correct once on failure; strip_code fail mode on persistent mismatch.",
+      "GenerationTrace logs validation_passed, fallback_reason for eval.",
+      "Baseline 132316: 0% pass, 14% fallback. Tuned 143246: pass 100%, fallback 0%."],
+     "src/code_validation.py, generation.py GenerationTrace", ["False positive vs false negative?", "Self-correct once — why?"], "prompts"),
 ])
 
 add_qs("architecture", [
@@ -186,13 +204,13 @@ add_qs("architecture", [
      ["Shard Chroma collections; metadata filters per department.",
       "Async indexing queue; separate embed service.",
       "Reranker batching; cache frequent queries.",
-      "Today: single collection, 81 chunks — prototype scale."],
+      "Today: single collection, 308 chunks (dual corpus) — prototype scale; hybrid BM25 shipped."],
      "indexing.py build_index incremental", ["Elasticsearch hybrid?", "Dedicated embed GPU?"], "architecture"),
     ("What's your evaluation harness architecture?", "Eval systems design — Anthropic cares deeply.",
-     ["15 cases JSON → retrieve → generate_grounded_answer_with_trace → LLM judge.",
-      "Append-only evaluation_results.json — 13 runs logged.",
-      "Config snapshots per run; guard_modified flag isolates guard regressions.",
-      "~16 min full run on CPU."],
+     ["60 cases JSON (15 policy + 35 guidebook + subsets) → retrieve → generate_grounded_answer_with_trace → LLM judge.",
+      "Append-only evaluation_results.json — 13 policy runs + Track A guidebook runs logged.",
+      "Config snapshots per run; guard_modified + code_validation trace fields isolate regressions.",
+      "~20 min full 60-case run on CPU."],
      "evaluation.py run_evaluation, scripts/evaluate.py", ["CI gate?", "Human eval overlap?"], "architecture"),
     ("Failure mode: three independent axes?", "Safety framing.",
      ["Faithfulness: unsupported claims.",
@@ -206,8 +224,8 @@ add_qs("production", [
     ("How did you productionize this?", "MLOps maturity for solo project.",
      ["Streamlit UI with index diagnostics; Docker Compose + host Ollama.",
       "entrypoint.sh: Ollama wait 60s, optional AUTO_INDEX_ON_START.",
-      "94 pytest tests; probe_chroma_index() for health.",
-      "Logs: app.log, citation pipeline, eval JSON."],
+      "180 pytest tests; probe_chroma_index() for health.",
+      "Logs: app.log, citation pipeline, eval JSON, GenerationTrace."],
      "Dockerfile, docker/entrypoint.sh, app/streamlit_app.py", ["CI/CD?", "K8s?"], "production"),
     ("Tell me about the citation trust bug.", "Production battle story.",
      ["UI ran separate retriever.retrieve() — showed all 6 reranked chunks.",
@@ -216,7 +234,7 @@ add_qs("production", [
       "tests/test_citations.py guards regression."],
      "citations.py select_citations_for_answer", ["Score fallback risks?", "User-reported vs eval?"], "production"),
     ("Chroma 'no index' false negative — what happened?", "Silent failure debugging.",
-     ["Streamlit showed Chunks: 0; CLI had 81.",
+     ["Streamlit showed Chunks: 0; CLI had 308.",
       "SharedSystemClient cached stale settings; telemetry conflict.",
       "Fix: reset_chroma_client_cache(), probe_chroma_index(), NoOpProductTelemetry.",
       "tests/test_chroma_telemetry.py."],
@@ -244,10 +262,10 @@ add_qs("production", [
       "Streamlit binds 0.0.0.0 — required for port mapping."],
      "docker-compose.yml, .streamlit/config.toml", ["Ollama in-compose variant?", "Model versioning?"], "production"),
     ("What's missing for true production?", "Calibration — Anthropic values honesty.",
-     ["No CI/CD pipeline; no automated eval gate on PR.",
+     ["No CI/CD pipeline; no automated eval gate on PR — Phase 4 CI is next (guidebook gate passed at 0.700 on run 164848).",
       "No production drift monitoring; no ACL per user.",
       "Benchmarked p50/p95 on golden set (53.5s/58.8s e2e) — no live-traffic metrics yet; CPU-only default.",
-      "Hybrid BM25 planned for legal exact-match terms."],
+      "Hybrid BM25 shipped; guidebook rel gate passed; faithfulness 0.629 still below 0.90 target."],
      "README2 open items", ["First priority if hired?", "90-day roadmap?"], "production"),
 ])
 
@@ -299,9 +317,9 @@ add_qs("tradeoffs", [
       "Limitation: same model family — note in interview."],
      "evaluation.py judge_answer_relevancy", ["Inter-rater agreement?", "Claude as judge?"], "tradeoffs"),
     ("If you had 2 more weeks?", "Prioritization.",
-     ["Re-run eval after remote_work judge patch; push relv ≥0.75.",
-      "Hybrid BM25 for clause IDs.",
-      "CI eval gate on PR; faithfulness recovery without relevancy loss.",
+     ["Phase 4 CI: pytest + stratified eval smoke (enumeration + code cases).",
+      "Full guidebook re-eval to confirm rel ≥ 0.70 before locking CI thresholds.",
+      "Independent Claude-as-judge; faithfulness recovery without relevancy loss.",
       "Live-traffic p95 dashboard (golden-set benchmark done: 58.8s e2e p95)."],
      "README2 roadmap", ["What would you cut?", "Ship vs perfect?"], "tradeoffs"),
     ("Biggest suboptimal decision?", "Credibility question.",
@@ -504,11 +522,11 @@ SVG_PIPELINE = '''<svg class="b3b-svg" viewBox="0 0 700 900" xmlns="http://www.w
 
 SVG_TRADEOFF = '''<svg class="b3b-svg" viewBox="0 0 800 360" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="d2" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#fff" opacity="0.06"/></pattern><marker id="ar2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#FFFF00"/></marker></defs><rect width="800" height="360" fill="#0c0e14"/><rect width="800" height="360" fill="url(#d2)"/><circle cx="400" cy="50" r="32" fill="#FFFF00" fill-opacity="0.12" stroke="#FFFF00" stroke-width="2"/><text class="node-label" x="400" y="55" text-anchor="middle">Query</text><path class="flow-arrow" d="M370 78 C280 110, 180 140, 160 165" stroke="#FFFF00" stroke-width="2" marker-end="url(#ar2)"/><path class="flow-arrow" d="M430 78 C520 110, 620 140, 640 165" stroke="#FFFF00" stroke-width="2" marker-end="url(#ar2)"/><rect x="40" y="165" width="320" height="160" rx="12" fill="#FC6255" fill-opacity="0.08" stroke="#FC6255"/><text class="phase-label" x="60" y="195" fill="#FC6255">Strict · Audit</text><text class="node-label" x="60" y="230">Faithfulness 1.00</text><text class="node-label" x="60" y="260">Relevancy 0.42</text><text class="node-sub" x="60" y="290">Over-abstention trap</text><rect x="440" y="165" width="320" height="160" rx="12" fill="#83C167" fill-opacity="0.08" stroke="#83C167"/><text class="phase-label" x="460" y="195" fill="#83C167">Balanced · Default</text><text class="node-label" x="460" y="230">Faithfulness 0.807</text><text class="node-label" x="460" y="260">Relevancy 0.747</text><text class="node-sub" x="460" y="290">Anthropic analog: helpful + honest</text><text font-family="IBM Plex Sans,sans-serif" font-size="10" fill="rgba(255,255,255,0.35)" x="400" y="345" text-anchor="middle">Name the Pareto frontier — do not optimize one metric silently</text></svg>'''
 
-SVG_EVAL = '''<svg class="b3b-svg" viewBox="0 0 800 320" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="d3" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#fff" opacity="0.06"/></pattern><marker id="ar3" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#FFFF00"/></marker></defs><rect width="800" height="320" fill="#0c0e14"/><rect width="800" height="320" fill="url(#d3)"/><rect x="30" y="120" width="120" height="50" rx="8" fill="#58C4DD" fill-opacity="0.15" stroke="#58C4DD"/><text class="node-label" x="90" y="150" text-anchor="middle">Change</text><path class="flow-arrow" d="M150 145 L190 145" stroke="#FFFF00" stroke-width="2" marker-end="url(#ar3)"/><rect x="190" y="120" width="140" height="50" rx="8" fill="#83C167" fill-opacity="0.15" stroke="#83C167"/><text class="node-label" x="260" y="142" text-anchor="middle">evaluate.py</text><text class="node-sub" x="260" y="158" text-anchor="middle">15 cases</text><path class="flow-arrow" d="M330 145 L370 145" stroke="#FFFF00" stroke-width="2" marker-end="url(#ar3)"/><rect x="370" y="110" width="150" height="70" rx="8" fill="#FF862F" fill-opacity="0.15" stroke="#FF862F"/><text class="node-label" x="445" y="138" text-anchor="middle">LLM Judge</text><text class="node-sub" x="445" y="158" text-anchor="middle">faith + relv</text><path class="flow-arrow" d="M520 145 L560 145" stroke="#FFFF00" stroke-width="2" marker-end="url(#ar3)"/><rect x="560" y="120" width="200" height="50" rx="8" fill="#9A72AC" fill-opacity="0.15" stroke="#9A72AC"/><text class="node-label" x="660" y="150" text-anchor="middle">evaluation_results.json</text><path d="M660 170 C660 220, 90 220, 90 175" stroke="#58C4DD" stroke-width="1.5" stroke-dasharray="6 4" fill="none" marker-end="url(#ar3)"/><text font-family="IBM Plex Sans,sans-serif" font-size="10" fill="#FC6255" x="400" y="260" text-anchor="middle">Regression 091001 caught: relv 0.40 → fix → 0.747</text></svg>'''
+SVG_EVAL = '''<svg class="b3b-svg" viewBox="0 0 800 320" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="d3" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#fff" opacity="0.06"/></pattern><marker id="ar3" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#FFFF00"/></marker></defs><rect width="800" height="320" fill="#0c0e14"/><rect width="800" height="320" fill="url(#d3)"/><rect x="30" y="120" width="120" height="50" rx="8" fill="#58C4DD" fill-opacity="0.15" stroke="#58C4DD"/><text class="node-label" x="90" y="150" text-anchor="middle">Change</text><path class="flow-arrow" d="M150 145 L190 145" stroke="#FFFF00" stroke-width="2" marker-end="url(#ar3)"/><rect x="190" y="120" width="140" height="50" rx="8" fill="#83C167" fill-opacity="0.15" stroke="#83C167"/><text class="node-label" x="260" y="142" text-anchor="middle">evaluate.py</text><text class="node-sub" x="260" y="158" text-anchor="middle">60 cases</text><path class="flow-arrow" d="M330 145 L370 145" stroke="#FFFF00" stroke-width="2" marker-end="url(#ar3)"/><rect x="370" y="110" width="150" height="70" rx="8" fill="#FF862F" fill-opacity="0.15" stroke="#FF862F"/><text class="node-label" x="445" y="138" text-anchor="middle">LLM Judge</text><text class="node-sub" x="445" y="158" text-anchor="middle">faith + relv</text><path class="flow-arrow" d="M520 145 L560 145" stroke="#FFFF00" stroke-width="2" marker-end="url(#ar3)"/><rect x="560" y="120" width="200" height="50" rx="8" fill="#9A72AC" fill-opacity="0.15" stroke="#9A72AC"/><text class="node-label" x="660" y="150" text-anchor="middle">evaluation_results.json</text><path d="M660 170 C660 220, 90 220, 90 175" stroke="#58C4DD" stroke-width="1.5" stroke-dasharray="6 4" fill="none" marker-end="url(#ar3)"/><text font-family="IBM Plex Sans,sans-serif" font-size="10" fill="#FC6255" x="400" y="260" text-anchor="middle">Policy 091001: relv 0.40→0.747 · Guidebook 164848: rel 0.700</text></svg>'''
 
-SVG_GEN = '''<svg class="b3b-svg" viewBox="0 0 900 300" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="dg" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#fff" opacity="0.06"/></pattern><marker id="arg" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#FFFF00"/></marker></defs><rect width="900" height="300" fill="#0c0e14"/><rect width="900" height="300" fill="url(#dg)"/><rect x="20" y="110" width="130" height="56" rx="8" fill="#58C4DD" fill-opacity="0.15" stroke="#58C4DD"/><text class="node-label" x="85" y="135" text-anchor="middle">_gen_interview</text><text class="node-sub" x="85" y="152" text-anchor="middle">notes.py</text><path class="flow-arrow" d="M150 138 L185 138" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="185" y="110" width="120" height="56" rx="8" fill="#83C167" fill-opacity="0.15" stroke="#83C167"/><text class="node-label" x="245" y="142" text-anchor="middle">add_qs()</text><path class="flow-arrow" d="M305 138 L340 138" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="340" y="110" width="100" height="56" rx="8" fill="#FF862F" fill-opacity="0.15" stroke="#FF862F"/><text class="node-label" x="390" y="142" text-anchor="middle">q()</text><path class="flow-arrow" d="M440 138 L475 138" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="475" y="100" width="130" height="76" rx="8" fill="#9A72AC" fill-opacity="0.15" stroke="#9A72AC"/><text class="node-label" x="540" y="128" text-anchor="middle">f-string</text><text class="node-sub" x="540" y="148" text-anchor="middle">+ project-plans CSS</text><path class="flow-arrow" d="M605 125 C650 80, 700 55, 740 55" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><path class="flow-arrow" d="M605 152 C650 195, 700 220, 740 220" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="740" y="30" width="145" height="48" rx="8" fill="#83C167" fill-opacity="0.2" stroke="#83C167" stroke-width="2"/><text class="node-label" x="812" y="58" text-anchor="middle">interview-notes.html</text><rect x="740" y="195" width="145" height="48" rx="8" fill="#58C4DD" fill-opacity="0.2" stroke="#58C4DD" stroke-width="2"/><text class="node-label" x="812" y="223" text-anchor="middle">gen-interview-notes.html</text><text font-family="IBM Plex Sans,sans-serif" font-size="10" fill="rgba(255,255,255,0.4)" x="450" y="275" text-anchor="middle">46 questions · 8 categories · Anthropic solo AI/ML engineer focus</text></svg>'''
+SVG_GEN = '''<svg class="b3b-svg" viewBox="0 0 900 300" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="dg" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#fff" opacity="0.06"/></pattern><marker id="arg" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#FFFF00"/></marker></defs><rect width="900" height="300" fill="#0c0e14"/><rect width="900" height="300" fill="url(#dg)"/><rect x="20" y="110" width="130" height="56" rx="8" fill="#58C4DD" fill-opacity="0.15" stroke="#58C4DD"/><text class="node-label" x="85" y="135" text-anchor="middle">_gen_interview</text><text class="node-sub" x="85" y="152" text-anchor="middle">notes.py</text><path class="flow-arrow" d="M150 138 L185 138" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="185" y="110" width="120" height="56" rx="8" fill="#83C167" fill-opacity="0.15" stroke="#83C167"/><text class="node-label" x="245" y="142" text-anchor="middle">add_qs()</text><path class="flow-arrow" d="M305 138 L340 138" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="340" y="110" width="100" height="56" rx="8" fill="#FF862F" fill-opacity="0.15" stroke="#FF862F"/><text class="node-label" x="390" y="142" text-anchor="middle">q()</text><path class="flow-arrow" d="M440 138 L475 138" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="475" y="100" width="130" height="76" rx="8" fill="#9A72AC" fill-opacity="0.15" stroke="#9A72AC"/><text class="node-label" x="540" y="128" text-anchor="middle">f-string</text><text class="node-sub" x="540" y="148" text-anchor="middle">+ project-plans CSS</text><path class="flow-arrow" d="M605 125 C650 80, 700 55, 740 55" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><path class="flow-arrow" d="M605 152 C650 195, 700 220, 740 220" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="740" y="30" width="145" height="48" rx="8" fill="#83C167" fill-opacity="0.2" stroke="#83C167" stroke-width="2"/><text class="node-label" x="812" y="58" text-anchor="middle">interview-notes.html</text><rect x="740" y="195" width="145" height="48" rx="8" fill="#58C4DD" fill-opacity="0.2" stroke="#58C4DD" stroke-width="2"/><text class="node-label" x="812" y="223" text-anchor="middle">gen-interview-notes.html</text><text font-family="IBM Plex Sans,sans-serif" font-size="10" fill="rgba(255,255,255,0.4)" x="450" y="275" text-anchor="middle">49 questions · 8 categories · Anthropic solo AI/ML engineer focus</text></svg>'''
 
-PITCH = """Employees need policy answers they can trust and verify — not confident hallucinations. As a solo AI/ML engineer, I built an evaluation-first RAG system for HR/legal handbooks: index PDFs with section metadata, over-retrieve and rerank, ground answers with a faithfulness guard, and show only citations the model actually used. On a 15-case golden benchmark, I recovered answer relevancy from a regression low of 0.40 to 0.747 — an 87% relative improvement — while raising context precision from 0.53 to 0.80. The key insight for alignment work: maximizing faithfulness alone collapsed relevancy to 0.42; I measured that trade-off explicitly instead of optimizing a single headline metric."""
+PITCH = """Employees need policy answers they can trust and verify — not confident hallucinations. As a solo AI/ML engineer, I built an evaluation-first RAG system across two corpora (308 chunks): hybrid BM25+dense retrieval, rerank, grounded generation, faithfulness guard, code validation, and citation-filtered UI. On the 15-case policy benchmark I recovered relevancy from 0.40 to 0.747 (+87%) while raising context precision to 0.80. On the guidebook track I fixed cross-corpus bleed, passed the full 35-case relevancy gate at 0.700 (run 164848), and raised enumeration relevancy to 0.84. The key insight for alignment work: maximizing faithfulness alone collapsed relevancy to 0.42; I measured that Pareto frontier explicitly instead of optimizing one headline metric."""
 
 html = f'''<!DOCTYPE html>
 <html lang="en">
@@ -565,11 +583,12 @@ html = f'''<!DOCTYPE html>
           <button class="btn" id="copy-pitch" type="button">Copy 60s Pitch</button>
         </div>
         <div class="hero-stats">
-          <span class="stat-pill metric"><strong>0.747</strong> Relevancy</span>
-          <span class="stat-pill"><strong>+87%</strong> Recovery</span>
-          <span class="stat-pill"><strong>0.80</strong> Ctx Precision</span>
-          <span class="stat-pill"><strong>94</strong> Tests</span>
-          <span class="stat-pill"><strong>15</strong> Golden Cases</span>
+          <span class="stat-pill metric"><strong>0.747</strong> Policy Rel</span>
+          <span class="stat-pill metric"><strong>0.700</strong> Guidebook Rel</span>
+          <span class="stat-pill metric"><strong>0.84</strong> Enum Rel</span>
+          <span class="stat-pill"><strong>308</strong> Chunks</span>
+          <span class="stat-pill"><strong>180</strong> Tests</span>
+          <span class="stat-pill"><strong>60</strong> Golden Cases</span>
         </div>
       </header>
 
@@ -626,11 +645,11 @@ html = f'''<!DOCTYPE html>
         </article>
         <article class="card">
           <h3>Retrieval — <code>src/retriever.py</code> + <code>postprocessors.py</code></h3>
-          <p><strong>Purpose:</strong> Rewrite → k=30 → bge-reranker-large → top 6 → 40% score filter.</p>
+          <p><strong>Purpose:</strong> Hybrid BM25+dense RRF → k=30 → bge-reranker-large → top 6 → 40% score filter. Corpus scope via <code>retrieval_scope.py</code>.</p>
           <ul class="bullets">
             <li><code>_PostprocessingRetriever</code> fixes LlamaIndex postprocessor gap</li>
-            <li><code>RelativeScoreThresholdPostprocessor</code> + <code>RERANK_MIN_KEEP=3</code></li>
-            <li><strong>Trade-off:</strong> +51% precision, +2× rerank latency</li>
+            <li><code>hybrid_retrieval.py</code> + <code>bm25_index.py</code> (ENABLE_HYBRID_BM25=true)</li>
+            <li><strong>Trade-off:</strong> +51% precision on policy baseline, +rerank latency on CPU</li>
           </ul>
         </article>
         <article class="card">
@@ -639,7 +658,7 @@ html = f'''<!DOCTYPE html>
         </article>
         <article class="card">
           <h3>Generation — <code>src/generation.py</code></h3>
-          <p><code>GroundedCompactAndRefine</code> → <code>normalize_balanced_answer()</code> → <code>apply_faithfulness_guard()</code>. Balanced reject keeps answer.</p>
+          <p><code>GroundedCompactAndRefine</code> → <code>normalize_balanced_answer()</code> → <code>apply_faithfulness_guard()</code> → <code>code_validation.py</code>. Balanced reject keeps answer.</p>
         </article>
         <article class="card">
           <h3>Prompts — <code>src/prompts.py</code></h3>
@@ -655,7 +674,7 @@ html = f'''<!DOCTYPE html>
         </article>
         <article class="card">
           <h3>Evaluation — <code>src/evaluation.py</code></h3>
-          <p>15 golden cases. Retrieval + LLM judge. <code>guard_modified</code> flag. 13 runs in JSON log.</p>
+          <p>60 golden cases (policy + guidebook + subsets). Retrieval + LLM judge. <code>guard_modified</code> + code validation traces. 13 policy runs + Track A guidebook runs in JSON log.</p>
         </article>
       </section>
 
@@ -665,13 +684,14 @@ html = f'''<!DOCTYPE html>
           <p><strong>Honest framing:</strong> This is not a fine-tuning project. Models are off-the-shelf via Ollama + sentence-transformers reranker.</p>
           <h4>Data</h4>
           <ul class="bullets">
-            <li>1 handbook PDF → 81 chunks; golden set v1.0: 15 cases (7 factual, 3 policy_interpretation, 3 edge_case, 2 multi_part)</li>
-            <li><code>data/eval/golden_dataset.json</code> — rubric expected_answer per case</li>
+            <li>Dual corpus: 80 policy + 228 guidebook chunks → 308 total; golden v2: 60 cases</li>
+            <li>Guidebook mix: 12 factual, 6 pattern, 6 workflow, 5 enumeration, 4 code, 2 edge_case</li>
+            <li><code>data/eval/golden_dataset.json</code> + <code>golden_dataset_guidebook.json</code></li>
           </ul>
-          <h4>Experimentation (13 logged runs)</h4>
+          <h4>Experimentation (policy + Track A runs)</h4>
           <ul class="bullets">
-            <li>Phased ablations: guard behavior, few-shots, TOP_N=6, judge context, normalize_balanced_answer</li>
-            <li>Baselines: run 052233 (ctx prec 0.53), strict 073816 (faith 1.0 / relv 0.42)</li>
+            <li>Policy: 13 runs — guard, few-shots, TOP_N=6, normalize_balanced_answer → 104356</li>
+            <li>Guidebook: re-index, code validation tuning (143246), corpus scope, enumeration (164848 rel 0.700)</li>
           </ul>
           <h4>Eval metrics</h4>
           <div class="table-wrap"><table>
@@ -693,8 +713,8 @@ html = f'''<!DOCTYPE html>
             <li><strong>Serving:</strong> Streamlit :8501; Docker Compose + host Ollama</li>
             <li><strong>Reliability:</strong> fail-open rewrite, reranker graceful degradation, probe_chroma_index(), citation score fallback capped</li>
             <li><strong>Observability:</strong> app.log, citation pipeline stages, eval JSON append-only</li>
-            <li><strong>Tests:</strong> 94 pytest across generation, citations, prompts, eval, chroma</li>
-            <li><strong>Gaps (say honestly):</strong> no CI/CD, no drift monitoring, no live-traffic p50/p95 (golden-set benchmark: 53.5s e2e p50), CPU-only default</li>
+            <li><strong>Tests:</strong> 180 pytest across generation, citations, prompts, eval, chroma, code validation, retrieval scope</li>
+            <li><strong>Gaps (say honestly):</strong> no CI/CD (Phase 4 deferred), no drift monitoring, no live-traffic p50/p95 (golden-set benchmark: 53.5s e2e p50), CPU-only default</li>
           </ul>
         </div>
       </section>
@@ -718,7 +738,10 @@ html = f'''<!DOCTYPE html>
           <div class="timeline-item"><h4>Regression 091001 — Relevancy 0.40</h4><p>Guard replaced good answers with abstention. Fixed: balanced reject → log → keep answer. Recovery to 0.747.</p></div>
           <div class="timeline-item"><h4>Strict mode trap — Faith 1.00 / Relv 0.42</h4><p>Maximizing faithfulness alone unusable for HR. Named Pareto frontier explicitly.</p></div>
           <div class="timeline-item"><h4>Citation trust bug</h4><p>Parallel UI retrieval showed Holidays for sick-leave. Fixed SourceTracking + mandatory [Source N].</p></div>
-          <div class="timeline-item"><h4>Chroma false negative</h4><p>Streamlit Chunks: 0 vs 81 actual. Fixed cache reset + NoOpProductTelemetry.</p></div>
+          <div class="timeline-item"><h4>Chroma false negative</h4><p>Streamlit Chunks: 0 vs 308 actual. Fixed cache reset + NoOpProductTelemetry.</p></div>
+          <div class="timeline-item"><h4>Cross-corpus bleed</h4><p>Guidebook questions retrieved handbook chunks. Fixed retrieval_scope.py source_file filter.</p></div>
+          <div class="timeline-item"><h4>Code validation 0% pass</h4><p>False-positive fallbacks on valid code. Tuned answer_only trigger → 100% pass (143246).</p></div>
+          <div class="timeline-item"><h4>Enumeration incompleteness</h4><p>six_building_blocks rel 0.0. Multi-query + section-diverse rerank → full guidebook rel 0.700 (164848).</p></div>
         </div>
         <p class="soundbite">"The project's memory is logs/evaluation_results.json — ship nothing without a trend line."</p>
       </section>
@@ -731,18 +754,20 @@ html = f'''<!DOCTYPE html>
           <tr><td>052233</td><td>Baseline</td><td>0.53</td><td>0.84</td><td>0.71</td></tr>
           <tr><td>073816</td><td>Strict</td><td>0.82</td><td class="high-score">1.00</td><td class="low-score">0.42</td></tr>
           <tr><td>091001</td><td>Regression</td><td>0.82</td><td>0.94</td><td class="low-score">0.40</td></tr>
-          <tr class="highlight-row"><td>104356</td><td>Best balanced</td><td class="high-score">0.80</td><td>0.807</td><td class="high-score">0.747</td></tr>
+          <tr class="highlight-row"><td>104356</td><td>Best balanced (policy)</td><td class="high-score">0.80</td><td>0.807</td><td class="high-score">0.747</td></tr>
+          <tr><td>152255</td><td>Guidebook post-tuning (35 cases)</td><td>0.657</td><td>0.564</td><td>0.629</td></tr>
+          <tr><td>160052</td><td>Enumeration subset (5 cases)</td><td class="high-score">1.00</td><td>—</td><td class="high-score">0.84</td></tr>
+          <tr class="highlight-row"><td>164848</td><td>Full guidebook post-enumeration</td><td>0.771</td><td>0.629</td><td class="high-score">0.700</td></tr>
         </table></div>
-        <p>Per-case: sick_leave relevancy 0.0→0.90; benefits, dress_code 0.0→0.8+.</p>
+        <p>Policy per-case: sick_leave relevancy 0.0→0.90. Guidebook: 0.629→0.700 on full 35-case run; enumeration bucket rel 0.84.</p>
       </section>
 
       <section id="s10">
         <h2>10. Future Improvements</h2>
         <ul class="bullets">
-          <li>Hybrid BM25 for exact legal terms</li>
+          <li>Phase 4 CI: pytest + stratified eval smoke (guidebook gate 0.700 passed on 164848)</li>
           <li>Faithfulness ≥0.90 without relevancy loss — tighter generation, not more abstention</li>
-          <li>CI eval gate; human eval overlap on golden set</li>
-          <li>Per-user ACL metadata filters; measured production latency</li>
+          <li>Independent Claude-as-judge; per-user ACL metadata filters; GPU latency path</li>
         </ul>
       </section>
 
@@ -776,7 +801,7 @@ html = f'''<!DOCTYPE html>
         <div class="comp-grid">
           <div class="comp-card"><h4>Diagram 1: Pipeline</h4><p>Ingest → Retrieve → Generate → Deliver. Label config.py and eval hook.</p></div>
           <div class="comp-card"><h4>Diagram 2: Trade-off fork</h4><p>Strict vs Balanced with faith/relv numbers. Anthropic analog: helpful vs harmless.</p></div>
-          <div class="comp-card"><h4>Diagram 3: Eval loop</h4><p>Change → 15 cases → judge → JSON log → regression catch.</p></div>
+          <div class="comp-card"><h4>Diagram 3: Eval loop</h4><p>Change → 60 cases (stratified subsets) → judge → JSON log → regression catch.</p></div>
         </div>
         <h3>Soundbites</h3>
         <div class="table-wrap"><table>
@@ -802,10 +827,10 @@ html = f'''<!DOCTYPE html>
           <p>Solo production RAG with alignment-aware eval — workflow-first grounding system, not a notebook demo.</p>
           <h3>Weak areas (address honestly)</h3>
           <ul class="bullets">
-            <li>No hybrid BM25; single PDF scale (81 chunks)</li>
-            <li>Faithfulness 0.807 vs 0.90 target on best balanced run</li>
-            <li>7B local model limits; no production traffic metrics</li>
-            <li>LLM judge not independent from generator</li>
+            <li>Guidebook faithfulness 0.629 vs 0.90 target; code-query rel 0.525 (run 164848)</li>
+            <li>Policy faithfulness 0.807 vs 0.90 target on best balanced run</li>
+            <li>7B local model limits; CPU e2e p50 53.5s; no production traffic metrics</li>
+            <li>LLM judge not independent from generator; Phase 4 CI not wired yet</li>
           </ul>
           <h3 class="red-flag">Red flags to avoid</h3>
           <ul class="bullets">
@@ -824,14 +849,15 @@ html = f'''<!DOCTYPE html>
             <li><strong>Resolved:</strong> 5-case human overlap — faith κ@0.5 1.0, relv κ@0.5 0.0 (logs/human_judge_agreement.json)</li>
             <li><strong>Resolved:</strong> Git-derived timeline — ~0.5 weeks span, 13 eval runs in 5.4h (docs/project_timeline.json)</li>
             <li><strong>Resolved:</strong> Measured p50/p95 — e2e 53.5s / 58.8s on 5 golden cases (logs/latency_benchmark.json)</li>
-            <li><strong>Remaining:</strong> Independent judge (Claude API) for faithfulness scoring — reduces same-model-family contamination</li>
+            <li><strong>Resolved:</strong> Hybrid BM25 shipped; corpus scoping; code validation 100% pass (143246); guidebook rel gate 0.700 (164848)</li>
+            <li><strong>Remaining:</strong> Independent judge (Claude API); Phase 4 CI wiring; faithfulness recovery on guidebook</li>
           </ul>
         </div>
       </section>
 
       <section id="s15">
         <h2>15. Follow-up Answer Bank</h2>
-        <p>92 mature answers · Anthropic-caliber · click any follow-up in <a href="#s11">Section 11</a> to jump here. Highlighted card = your target answer.</p>
+        <p>98 mature answers · Anthropic-caliber · click any follow-up in <a href="#s11">Section 11</a> to jump here. Highlighted card = your target answer.</p>
         <div class="btn-row">
           <button class="btn" id="expand-fu-groups" type="button">Expand All Answers</button>
           <button class="btn" id="collapse-fu-groups" type="button">Collapse Groups</button>
@@ -841,7 +867,7 @@ html = f'''<!DOCTYPE html>
 
       <footer>
         <p><strong>Company Policy RAG</strong> — Interview Notes for Anthropic<br>
-        <a href="project-plans.html">Engineering Plans</a> · <a href="gen-interview-notes.html">Generator Docs</a> · <a href="../README2.md">README2</a> · <a href="https://github.com/SoubhagyaJain/Rag-chatbot">GitHub</a></p>
+        <a href="project-plans.html">Engineering Plans</a> · <a href="gen-interview-notes.html">Generator Docs</a> · <a href="../README3.md">README3</a> · <a href="https://github.com/SoubhagyaJain/Rag-chatbot">GitHub</a></p>
       </footer>
     </main>
   </div>

@@ -121,6 +121,10 @@ def main(argv: list[str] | None = None) -> int:
             logger.warning("  %s", err)
         return 1
 
+    if stats["count"] <= 0:
+        logger.error("Indexing produced zero chunks in Chroma — check Ollama embed model.")
+        return 1
+
     # Touch index to confirm it loaded
     _ = index
     return 0

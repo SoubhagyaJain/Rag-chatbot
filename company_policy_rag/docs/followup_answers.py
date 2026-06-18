@@ -17,7 +17,7 @@ def para(text: str) -> str:
 
 ANSWERS: dict[tuple[str, str], str] = {
     ('Walk me through this project in 60 seconds.', 'What would you do differently?'): para(
-        'I would add hybrid BM25 for exact legal clause matches and wire an independent Claude-as-judge for faithfulness scoring in evaluation.py, while keeping local qwen2.5:7b generation. I would also add a CI eval smoke gate on the 15 golden cases so no change merges if relevancy drops below 0.70. At 81 chunks the retrieval stack is solid; those upgrades close the biggest gaps before multi-doc scale.'
+        'I would wire an independent Claude-as-judge for faithfulness scoring in evaluation.py while keeping local qwen2.5:7b generation, and add Phase 4 CI: pytest gate plus eval smoke on a stratified golden subset. Hybrid BM25 and corpus-scoped retrieval are shipped on the 308-chunk dual-corpus index; guidebook rel gate passed at 0.700 (run 164848). Next gap is faithfulness recovery (0.629 vs 0.90) without relevancy loss.'
     ),
     ('Walk me through this project in 60 seconds.', 'Biggest failure?'): para(
         'Run 091001: answer relevancy collapsed to 0.40 even though context precision held at 0.82—the faithfulness guard in generation.py was replacing substantive answers with abstention boilerplate. I traced it via guard_modified flags in evaluation.py and fixed prompts, few-shots, and guard behavior across four phases. Recovery landed at 0.747 relevancy on run 104356 without hiding the regression in logs.'
@@ -26,10 +26,10 @@ ANSWERS: dict[tuple[str, str], str] = {
         'The golden set in golden_dataset.json has rubric expected_answer fields per case—I use those as anchor criteria. The relevancy judge in evaluation.py sees retrieved context plus the question so it does not penalize correct abstention when the topic is absent. I log per-case judge_notes and compare trends across 13 eval runs rather than trusting a single aggregate score.'
     ),
     ("Why is this relevant to Anthropic's work?", 'What about scalable oversight?'): para(
-        'At 15 cases I do human-style rubric design with LLM execution; the scalable piece is append-only evaluation_results.json that catches regressions like 091001 automatically. For growth I would stratify golden cases by failure mode (faithfulness, relevancy, citation precision), add human spot-checks on disagreements, and use strict vs balanced modes in prompts.py as explicit oversight knobs for auditors vs employees.'
+        'At 60 golden cases (15 policy + 35 guidebook + subsets) I do human-style rubric design with LLM execution; the scalable piece is append-only evaluation_results.json that catches regressions like 091001 automatically. Cases are stratified by failure mode (faithfulness, relevancy, citation precision, enumeration, code validation); human spot-checks on disagreements and strict vs balanced modes in prompts.py act as oversight knobs for auditors vs employees.'
     ),
     ('What was your role and scope?', 'How long did it take?'): para(
-        'Git shows one commit on 2026-06-17 (~0.5 calendar weeks in span); the real work was an intensive same-day solo sprint—13 logged eval runs over ~5.4 hours UTC (05:22–10:44), best balanced run 104356. Scope: indexing through Streamlit UI, Docker, 94 pytest tests, LlamaIndex 0.14 migration. Each full 15-case eval takes ~16 minutes on CPU; the harness in evaluation.py was the forcing function—changes did not ship without a trend line. Source: docs/project_timeline.json (git log + evaluation_results.json).'
+        'Git shows one commit on 2026-06-17 (~0.5 calendar weeks in span); intensive solo sprint with 13 policy eval runs on 2026-06-17 (best balanced 104356) plus Track A guidebook work on 2026-06-18 (60 golden cases, full guidebook gate 164848 rel 0.700). Scope: indexing through Streamlit UI, Docker, 180 pytest tests, LlamaIndex 0.14 migration. Full guidebook eval takes ~47 minutes on CPU; evaluation.py is the forcing function. Source: docs/project_timeline.json and README3.md.'
     ),
     ('What was your role and scope?', 'What would a team split look like?'): para(
         'I would split retrieval/indexing (retriever.py, indexing.py, query_processing.py), generation/safety (generation.py, prompts.py, citations.py), and platform/eval (evaluation.py, agent.py, Streamlit, Docker). config.py stays shared so retrieval and eval never drift. As solo builder I wore all three hats, which is why get_retrieval_config_summary() snapshots settings per eval run.'
@@ -41,7 +41,7 @@ ANSWERS: dict[tuple[str, str], str] = {
         'Every eval run logs config snapshots, guard_modified flags, and pre_guard_answer traces. I added pytest coverage for guard behavior, citation selection, and normalize_balanced_answer. Before declaring victory I now check faithfulness and relevancy together—strict mode taught me that faith 1.00 with relevancy 0.42 is a silent failure.'
     ),
     ('What would you put on a Claude system card for this?', 'Residual risk?'): para(
-        'Residual risks: faithfulness 0.807 on best balanced run 104356 still below the 0.90 target; qwen2.5:7b can paraphrase unsupported details; single PDF / 81 chunks does not prove multi-doc generalization. Score-based citation fallback in citations.py can surface chunks not tagged in the answer if the model omits [Source N] tags. Policy staleness is not detected automatically.'
+        'Residual risks: policy faithfulness 0.807 on run 104356 still below 0.90; guidebook faithfulness 0.629 on run 164848 (rel gate passed at 0.700); code-query rel 0.525 on full guidebook run; qwen2.5:7b can paraphrase unsupported details; 308 chunks does not prove 10k-PDF generalization. Score-based citation fallback in citations.py can surface chunks not tagged in the answer if the model omits [Source N] tags. Policy staleness is not detected automatically.'
     ),
     ('What would you put on a Claude system card for this?', 'Human escalation path?'): para(
         'When balanced mode cannot ground an answer or guard rejects with high confidence, the UI should route to HR—not fabricate policy. Strict mode (faith 1.00, relevancy 0.42) is the audit setting where abstention is preferred. I document both modes in prompts.py via resolve_grounding_mode; sidebar toggle lets users pick. Production gap: no formal ticketing integration yet.'
@@ -50,13 +50,13 @@ ANSWERS: dict[tuple[str, str], str] = {
         'Measured on 5 golden cases (logs/latency_benchmark.json): Chroma p50 49ms, but bge-reranker-large on 30 candidates costs p50 28.5s on CPU—dominates e2e. Full path p50 53.5s / p95 58.8s (rewrite 1.1s, generation 20.2s, guard 859ms). Acceptable for internal HR, not consumer chat. Trade paid off: context precision 0.53→0.80, hit rate ~0.867.'
     ),
     ('Why over-retrieve then rerank instead of top-k=6 directly?', 'Why not hybrid BM25?'): para(
-        'Hit rate was already 0.867—recall was not the bottleneck; noisy context was (precision 0.53). Hybrid BM25 is on the roadmap for exact clause IDs and legal vocabulary. Today I use augment_query_with_policy_terms in query_processing.py for deterministic expansion (e.g., resignation→at-will). Measured choice, not theoretical.'
+        'On the original 15-case policy set, hit rate was ~0.867—precision was the bottleneck (0.53). Hybrid BM25 is now shipped: dense k=30 + BM25 RRF in hybrid_retrieval.py (ENABLE_HYBRID_BM25=true). I still use augment_query_with_policy_terms and augment_query_with_guidebook_terms for deterministic expansion before LLM rewrite. Measured choice, not theoretical.'
     ),
     ('Why bge-reranker-large over base?', 'GPU path?'): para(
         'Default is CPU in Docker for portability; sentence-transformers cross-encoder runs fine but ~2× slower than GPU. config.py exposes RERANKER_MODEL_NAME; GPU would mainly cut the 200–600ms rerank slice. Graceful degradation if sentence-transformers is missing—vector-only retrieval still works with install hints in retriever.py.'
     ),
     ('Why bge-reranker-large over base?', 'ColBERT alternative?'): para(
-        'ColBERT offers late interaction for better lexical matching but adds indexing complexity and another dependency. For 81 chunks on one handbook, cross-encoder rerank on k=30 was the high-ROI choice—+51% context precision in eval logs. At 10k PDFs I would revisit ColBERT or hybrid BM25 before bolting on more neural rankers.'
+        'ColBERT offers late interaction for better lexical matching but adds indexing complexity and another dependency. For 308 chunks on two corpora, cross-encoder rerank on k=30 was the high-ROI choice—+51% context precision on the policy baseline. BM25 hybrid now covers lexical gaps; at 10k PDFs I would revisit ColBERT before more neural rankers.'
     ),
     ('How do you handle vocabulary mismatch?', 'Why not HyDE?'): para(
         'HyDE generates a hypothetical document—risky in legal/policy domains where hallucinated statutes pollute retrieval. I chose rule-based augment_query_with_policy_terms plus LLM rewrite (35 words max, fail-open). Measured: notice_resignation relevancy went 0.0→0.80. Eval-driven, not theory.'
@@ -68,7 +68,7 @@ ANSWERS: dict[tuple[str, str], str] = {
         'I used 640 tokens with 64 overlap via section-aware SentenceSplitter in indexing.py—section_path metadata preserves legal structure. I did not run a full grid search; fixed char splits were rejected because they split mid-clause. Next ablation would compare 512/64 vs 640/64 on context precision in evaluation.py.'
     ),
     ('Explain your chunking strategy.', 'Multi-doc?'): para(
-        'Today: one handbook PDF → 81 chunks in a single Chroma collection with file_hash for incremental SHA-256 indexing. Multi-doc would add collection sharding or metadata filters per department in config.py. enrich_nodes_with_sections() already attaches section_path and page_number for filtering.'
+        'Today: policy handbook (80 chunks) + AI Agents guidebook (228 chunks) → 308 chunks in one Chroma collection with file_hash incremental indexing. Corpus-scoped eval uses source_file post-filter in retrieval_scope.py. Multi-department sharding is Track A Phase 5; enrich_nodes_with_sections() attaches section_path and page_number for filtering.'
     ),
     ('What is context precision vs hit rate?', 'Context recall formula?'): para(
         'In evaluation.py compute_retrieval_metrics: context recall = matched keywords from relevant_sections / len(relevant_sections). Hit rate asks whether any relevant chunk appears in top-k (~0.867 stable). Precision asks what fraction of retrieved chunks are relevant—that was 0.53 baseline, 0.80 after rerank pipeline in run 104356.'
@@ -113,7 +113,7 @@ ANSWERS: dict[tuple[str, str], str] = {
         'That is my top eval upgrade: keep offline qwen2.5:7b for generation per project constraints, call Claude for faithfulness/relevancy judging with retrieved context. Would break correlation, improve rubric adherence, and mirror how I would validate a safety-critical change at Anthropic—measure with a stronger independent evaluator.'
     ),
     ('Draw the end-to-end architecture.', 'Where is bottleneck?'): para(
-        'End-to-end ~3–8s on CPU: generation 1–5s dominates, then rerank 200–600ms, guard 200–800ms, rewrite 200–800ms. Chroma at 81 chunks is cheap. For internal HR that is acceptable; chat-scale would need caching frequent queries, GPU rerank, or async Streamlit paths.'
+        'Measured e2e p50 53.5s on 5 golden cases (logs/latency_benchmark.json): rerank 28.5s dominates, then generation 20.2s, guard 859ms, rewrite 1.1s; Chroma at 308 chunks is still cheap. Acceptable for internal HR eval harness, not chat-scale—would need GPU rerank, query cache, or async Streamlit paths.'
     ),
     ('Draw the end-to-end architecture.', 'Async path?'): para(
         'Not implemented—Streamlit and agent.py are synchronous today. Async would help parallelize rewrite plus retrieval warm-up and batch reranker scoring. evaluation.py harness already shares retriever.py pipeline for consistency; async refactor would start at the UI boundary without forking retrieval logic.'
@@ -143,13 +143,13 @@ ANSWERS: dict[tuple[str, str], str] = {
         'policy_search is the only retrieval tool—it wraps build_query_engine() so the agent cannot invent a parallel retrieval path. Meta questions and greetings handled without tool call. Risk remains the model fabricating tool arguments; mitigation is narrow tool surface and eval cases for off-topic queries.'
     ),
     ('How would you scale this to 10k PDFs?', 'Elasticsearch hybrid?'): para(
-        'Would add BM25 for clause IDs and exact legal terms while keeping Chroma for semantic recall—hybrid is on README2 roadmap. Shard collections by department; metadata filters on section_path. Today 81 chunks is prototype scale; reranker batching and query cache become necessary at 10k PDFs.'
+        'Hybrid BM25 is shipped: dense k=30 + BM25 RRF in hybrid_retrieval.py (ENABLE_HYBRID_BM25=true). At 10k PDFs I would shard collections by department, add metadata filters on section_path, reranker batching, and query cache. Today 308 chunks (80 policy + 228 guidebook) is dual-corpus prototype scale—not 10k PDFs yet.'
     ),
     ('How would you scale this to 10k PDFs?', 'Dedicated embed GPU?'): para(
         'Embedding 10k PDFs dominates indexing time on CPU; a dedicated embed service on GPU would shorten build_index() cycles in indexing.py. Incremental SHA-256 file_hash indexing already avoids full re-embed on unchanged files. Separate embed service decouples indexing queue from query serving.'
     ),
     ("What's your evaluation harness architecture?", 'CI gate?'): para(
-        'Not wired yet—honest gap. Would run scripts/evaluate.py on PRs, fail if relevancy < 0.70 or faithfulness drops >0.05 vs last main run. 15 cases × ~16 min is heavy for CI; I would start with a 5-case smoke subset plus nightly full golden run. evaluation_results.json append-only log is CI-ready data.'
+        'Not wired yet—honest gap. Would run scripts/evaluate.py on PRs, fail if relevancy < 0.70 or faithfulness drops >0.05 vs last main run. 60 cases × ~20 min is heavy for CI; I would start with a stratified smoke subset (enumeration + code cases—gate already passed at enum rel 0.84 on run 160052) plus nightly full golden run. evaluation_results.json append-only log is CI-ready data.'
     ),
     ("What's your evaluation harness architecture?", 'Human eval overlap?'): para(
         'Ran 5-case human overlap (sick_leave, notice_resignation, remote_work, harassment_rules, outside_employment) against run 104356 outputs—rubric in data/eval/HUMAN_EVAL_RUBRIC.md, scores in human_eval_scores.json. Faithfulness: Pearson r 0.95, MAE 0.05, κ@0.5 threshold 1.0, 80% within 0.1. Relevancy: r 0.824, MAE 0.17, κ@0.5 0.0, 60% within 0.1. Biggest disagreement: remote_work relevancy (human 0.5 vs LLM 0.0)—LLM penalized partial answer; human credited policy-grounded content. Agreement script: scripts/compare_human_judge.py → logs/human_judge_agreement.json.'
@@ -161,7 +161,7 @@ ANSWERS: dict[tuple[str, str], str] = {
         'Employee asks sick-leave days; model answers plausibly but cites Holidays policy—employee takes wrong PTO action. Hallucinated benefits are another harm vector measured by faithfulness judge. Over-abstention in strict mode harms differently: correct topic, no answer. I default balanced for usefulness; strict for auditors.'
     ),
     ('How did you productionize this?', 'CI/CD?'): para(
-        'Docker Compose plus Streamlit plus 94 pytest tests, but no automated pipeline—tests and evaluate.py are manual today. Would add GitHub Actions: pytest on PR, optional eval smoke, image build to registry. entrypoint.sh already waits for Ollama and supports AUTO_INDEX_ON_START.'
+        'Docker Compose plus Streamlit plus 180 pytest tests, but no automated pipeline—tests and evaluate.py are manual today. Would add GitHub Actions: pytest on PR, optional eval smoke on stratified golden subset, image build to registry. entrypoint.sh already waits for Ollama and supports AUTO_INDEX_ON_START.'
     ),
     ('How did you productionize this?', 'K8s?'): para(
         'Docker is deployment-ready for a single replica; K8s would add for multi-tenant HR scale: separate Ollama inference deployment, Chroma or managed vector DB StatefulSet, Streamlit HPA. Host Ollama pattern does not map cleanly to K8s—I would move inference in-cluster with model versioning.'
@@ -173,7 +173,7 @@ ANSWERS: dict[tuple[str, str], str] = {
         'Caught in QA: sick-leave answer displayed Holidays/Visitors sources—the eval set later added cases to prevent recurrence. tests/test_citations.py guards select_citations_for_answer. Lesson: citation trust bugs are user-visible before aggregate metrics move; pipeline logging chroma_retrieved → post_rerank → query_engine_output helps.'
     ),
     ("Chroma 'no index' false negative — what happened?", 'Multi-worker Chroma?'): para(
-        'SharedSystemClient cached stale settings caused Streamlit to show Chunks: 0 while CLI had 81—telemetry conflict. Multi-worker Streamlit would amplify that; fix was reset_chroma_client_cache() and probe_chroma_index() in indexing.py. Managed vector DB or single-worker Chroma behind a service is safer for production.'
+        'SharedSystemClient cached stale settings caused Streamlit to show Chunks: 0 while CLI had 308—telemetry conflict. Multi-worker Streamlit would amplify that; fix was reset_chroma_client_cache() and probe_chroma_index() in indexing.py. Managed vector DB or single-worker Chroma behind a service is safer for production.'
     ),
     ("Chroma 'no index' false negative — what happened?", 'Managed vector DB?'): para(
         'At prototype scale embedded Chroma works; production would consider Pinecone/Weaviate/pgvector for HA and consistent client semantics. tests/test_chroma_telemetry.py plus NoOpProductTelemetry addressed local pain. Migration path: same metadata schema (section_path, page_number, file_hash).'
@@ -200,13 +200,13 @@ ANSWERS: dict[tuple[str, str], str] = {
         'Host Ollama reuses existing GPU/RAM and keeps the app container lightweight—docker-compose.yml points to host.docker.internal:11434. In-compose Ollama simplifies onboarding at cost of image size and GPU passthrough complexity. Volumes persist data/storage/logs/hf_cache either way.'
     ),
     ('Docker: why Ollama on host?', 'Model versioning?'): para(
-        'Would pin Ollama model tags in config.py (OLLAMA_MODEL=qwen2.5:7b) and document in README; eval runs snapshot model in get_retrieval_config_summary(). Production needs explicit upgrade playbook—re-run 15 golden cases before promoting a new weights version.'
+        'Would pin Ollama model tags in config.py (OLLAMA_MODEL=qwen2.5:7b) and document in README; eval runs snapshot model in get_retrieval_config_summary(). Production needs explicit upgrade playbook—re-run stratified golden subset (policy factual + guidebook enumeration/code) before promoting a new weights version.'
     ),
     ("What's missing for true production?", 'First priority if hired?'): para(
-        'CI eval gate with smoke golden subset plus independent Claude-as-judge for faithfulness—closes the loop between research rigor and shipping. Second: hybrid BM25 for legal exact-match. Both directly attack faith 0.807 vs 0.90 gap without sacrificing 0.747 relevancy.'
+        'Phase 4 CI: pytest gate plus eval smoke on stratified golden subset so merges block on retrieval/regression. Guidebook rel gate passed at 0.700 (run 164848); lock CI thresholds against that baseline. Second: independent Claude-as-judge for faithfulness to close the 0.629 gap on guidebook.'
     ),
     ("What's missing for true production?", '90-day roadmap?'): para(
-        'Days 1–30: CI pytest plus eval smoke, OTel spans, Claude judge pilot. Days 31–60: hybrid BM25, 5-case human eval overlap, faithfulness recovery via tighter prompts. Days 61–90: metadata ACL filters, nightly full golden run, p95 latency measurement in staging.'
+        'Days 1–30: Phase 4 CI (pytest + eval smoke), OTel spans, full guidebook re-eval. Days 31–60: human-judge overlap, faithfulness recovery on guidebook without relevancy loss. Days 61–90: metadata ACL filters, nightly full golden run, semantic query cache, p95 dashboard in staging.'
     ),
     ('Why ReAct agent vs always-on RAG?', 'When does agent skip retrieval?'): para(
         'Greetings, meta questions, and clarifications skip policy_search—the agent answers from system prompt. Substantive policy questions invoke policy_search which runs full build_query_engine() pipeline (k=30, rerank, guard). Same stack, no duplicate retrieval code in agent.py.'
@@ -233,7 +233,7 @@ ANSWERS: dict[tuple[str, str], str] = {
         'Layers encode norms: prompts/few-shots set priors, normalize fixes format violations, guard enforces contextual faithfulness, [Source N] enforces verifiability. Like critique-and-revise, but specialized for RAG policy QA. Trade-off naming (balanced vs strict) matches explicit norm selection.'
     ),
     ('LlamaIndex 0.14 migration — what broke?', 'Vendor lock-in?'): para(
-        'ReActAgent.from_tools() removal broke Streamlit until I migrated to agent.run() workflow API—upgrade tax is real. Mitigation: thin adapters in agent.py, pin versions, 94 tests. Raw LangGraph would add flexibility at integration cost; policy_search wrapper contains most lock-in surface.'
+        'ReActAgent.from_tools() removal broke Streamlit until I migrated to agent.run() workflow API—upgrade tax is real. Mitigation: thin adapters in agent.py, pin versions, 180 tests. Raw LangGraph would add flexibility at integration cost; policy_search wrapper contains most lock-in surface.'
     ),
     ('LlamaIndex 0.14 migration — what broke?', 'Raw LangGraph?'): para(
         'LangGraph gives explicit state machine for tool loops—attractive for max_iterations and human-in-the-loop. I stayed on LlamaIndex because SourceTrackingQueryEngine, GroundedCompactAndRefine, and retriever wrappers were already integrated. Would prototype LangGraph only if agent complexity grew past single-tool RAG.'
@@ -257,7 +257,7 @@ ANSWERS: dict[tuple[str, str], str] = {
         'Top methodology upgrade: independent model family judging faithfulness/relevancy with retrieved context, while qwen2.5:7b stays local generator. Reduces contamination from shared weights. Anthropic-aligned validation pattern—stronger judge than policy generator.'
     ),
     ('If you had 2 more weeks?', 'What would you cut?'): para(
-        'I would cut Streamlit polish and new agent features before cutting eval or tests. Hybrid BM25 and CI smoke eval deliver more safety ROI than UI extras. 94 pytest tests and 13-run log stay non-negotiable—they are how I caught 091001 and the citation bug.'
+        'I would cut Streamlit polish and new agent features before cutting eval or tests. Phase 4 CI smoke and full guidebook validation deliver more safety ROI than UI extras. 180 pytest tests and append-only eval logs stay non-negotiable—they caught 091001, the citation bug, and enumeration regressions.'
     ),
     ('If you had 2 more weeks?', 'Ship vs perfect?'): para(
         'Ship at 0.747 relevancy (within 0.003 of 0.75 target) with documented faith 0.807 gap—honest beats rounded claims. Perfection on faith 1.00 already proved unusable (relv 0.42 strict). Eval trend line is the ship gate, not gut feel.'
@@ -290,6 +290,24 @@ ANSWERS: dict[tuple[str, str], str] = {
         'Scalable oversight, eval methodology at frontier-model scale, and how teams ship alignment constraints without collapsing helpfulness—the faith/relevancy frontier I measured locally. I want to work where honest metric reporting and safety documentation are cultural defaults, not interview surprises.'
     ),
     ('Why should Anthropic hire you based on this project?', 'Research vs applied?'): para(
-        'This repo is applied with research discipline: 13 eval runs, Pareto analysis, system-card thinking. I enjoy building production workflows (generation.py, citations.py) grounded in measurement (evaluation.py). Anthropic blend of both is the fit—ship grounded systems, publish honest limits.'
+        'This repo is applied with research discipline: 13 policy eval runs plus Track A guidebook runs, Pareto analysis, system-card thinking. I enjoy building production workflows (generation.py, citations.py) grounded in measurement (evaluation.py). Anthropic blend of both is the fit—ship grounded systems, publish honest limits.'
+    ),
+    ('How do you handle enumeration and comprehensive-list questions?', 'Why multi-query retrieval?'): para(
+        'is_comprehensive_list_query() in query_processing.py detects list/enumeration intent (e.g. "6 building blocks"). augment_query_with_guidebook_terms() adds named subqueries; retriever.py issues multi-query Chroma retrieval, diversifies by section_path via _diversify_comprehensive_nodes(), and bumps reranker top_n to 12. Zero-chunk fallback widens the pool. Run 164848: full guidebook rel 0.700; enumeration bucket rel 0.84, hit 1.00.'
+    ),
+    ('How do you handle enumeration and comprehensive-list questions?', 'How do you measure list completeness?'): para(
+        'Golden cases like six_building_blocks have rubric expected_answer with all items; LLM relevancy judge scores partial lists low. I also log hit rate (any relevant section retrieved) separately from relevancy (answer completeness). six_building_blocks went rel 0.0→0.80 after enumeration tuning. At scale I would add explicit item-coverage metric: matched rubric items / total expected items.'
+    ),
+    ('What is cross-corpus bleed and how did you fix it?', 'When would you disable corpus scoping?'): para(
+        'Disable corpus scoping only for intentional cross-document questions (e.g. "compare HR policy vs agent guidebook")—not the default. Today eval cases declare corpus in golden JSON; retrieval_scope.py applies source_file post-filter from case metadata. Production would need explicit user/tenant corpus selection in Streamlit, not silent global search across all indexed PDFs.'
+    ),
+    ('What is cross-corpus bleed and how did you fix it?', 'Eval signal for bleed?'): para(
+        'Retrieval_miss bucket with handbook section_path on guidebook questions—role_playing_block and planning_block were the canonical cases. Context precision stays high while answer cites wrong corpus vocabulary. I added corpus-scoped eval (--corpus guidebook) and tests in retrieval_scope.py; post-fix role_playing_block no longer surfaces handbook chunks in top-k.'
+    ),
+    ('Walk me through post-generation code validation.', 'False positive vs false negative?'): para(
+        'False positive: valid code stripped to low-confidence fallback—was the 0% pass / 14% fallback crisis on guidebook baseline 132316 (tools_real_world had good pre-guard answer). False negative: hallucinated line passes validation—faithfulness judge catches downstream. Fix: answer_only trigger (validate only model-generated code, not retrieved excerpts) plus strip_code fail mode. Weak subset 143246: pass 100%, fallback 0%.'
+    ),
+    ('Walk me through post-generation code validation.', 'Self-correct once — why?'): para(
+        'One retry balances cost and recovery: code_validation.py asks the model to fix failing lines against retrieved context, then re-validates. More than one retry risks infinite rewrite loops and latency blow-up on CPU. Traces in GenerationTrace log validation_passed, fallback_reason, and pre/post-correct code for eval—scripts/analyze_eval_failures.py buckets code_validation_fallback cases.'
     ),
 }

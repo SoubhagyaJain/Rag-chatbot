@@ -47,4 +47,5 @@ Thumbs.db
 
 # User uploads in legal/ — keep local (sample handbook lives in policies/)
 data/legal/*.pdf
+!data/legal/AI_Agents_guidebook.pdf
 !data/legal/.gitkeep

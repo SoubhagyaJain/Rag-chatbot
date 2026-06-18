@@ -1,0 +1,149 @@
+{
+  "version": "1.0",
+  "description": "Stratified CI smoke subset: 2 policy, 5 enumeration, 1 code/factual guidebook",
+  "case_count": 8,
+  "query_type_counts": {
+    "factual": 2,
+    "edge_case": 1,
+    "enumeration": 5
+  },
+  "cases": [
+    {
+      "id": "sick_leave",
+      "corpus": "policy",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "How many sick days do employees receive and how are they used?",
+      "expected_answer": "Should describe sick leave.",
+      "relevant_sections": [
+        "sick",
+        "illness",
+        "medical leave"
+      ],
+      "expected_key_points": [
+        "sick",
+        "leave"
+      ]
+    },
+    {
+      "id": "notice_resignation",
+      "corpus": "policy",
+      "query_type": "edge_case",
+      "category": "edge_case",
+      "question": "What happens if I do not give notice when resigning?",
+      "expected_answer": "Should explain notice and at-will.",
+      "relevant_sections": [
+        "resignation",
+        "at-will",
+        "termination"
+      ],
+      "expected_key_points": [
+        "notice",
+        "resign"
+      ]
+    },
+    {
+      "id": "tools_real_world",
+      "corpus": "guidebook",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "What real-world capability does the currency tool demonstrate?",
+      "expected_answer": "Should explain real-time currency conversion tool.",
+      "relevant_sections": [
+        "real-time currency",
+        "conversion"
+      ],
+      "expected_key_points": [
+        "currency"
+      ]
+    },
+    {
+      "id": "six_building_blocks",
+      "corpus": "guidebook",
+      "query_type": "enumeration",
+      "category": "enumeration",
+      "question": "List and explain the 6 building blocks of AI Agents.",
+      "expected_answer": "Should list all six blocks from the guidebook.",
+      "relevant_sections": [
+        "building blocks",
+        "Role",
+        "Tools",
+        "Memory",
+        "Guardrails",
+        "Planning"
+      ],
+      "expected_key_points": [
+        "building",
+        "block",
+        "tools",
+        "memory"
+      ]
+    },
+    {
+      "id": "design_patterns_popular",
+      "corpus": "guidebook",
+      "query_type": "enumeration",
+      "category": "enumeration",
+      "question": "What are the most popular agent design patterns mentioned?",
+      "expected_answer": "Should list design patterns like ReAct.",
+      "relevant_sections": [
+        "design patterns",
+        "ReAct",
+        "popular"
+      ],
+      "expected_key_points": [
+        "pattern",
+        "ReAct"
+      ]
+    },
+    {
+      "id": "memory_short_long",
+      "corpus": "guidebook",
+      "query_type": "enumeration",
+      "category": "enumeration",
+      "question": "What types of memory do agents use?",
+      "expected_answer": "Should describe memory categories.",
+      "relevant_sections": [
+        "Memory",
+        "short",
+        "long"
+      ],
+      "expected_key_points": [
+        "memory"
+      ]
+    },
+    {
+      "id": "enumeration_subagents",
+      "corpus": "guidebook",
+      "query_type": "enumeration",
+      "category": "enumeration",
+      "question": "What roles can sub-agents play in orchestration?",
+      "expected_answer": "Should describe sub-agent specialization.",
+      "relevant_sections": [
+        "sub-agent",
+        "manager",
+        "specialist"
+      ],
+      "expected_key_points": [
+        "sub-agent"
+      ]
+    },
+    {
+      "id": "agent_building_blocks_count",
+      "corpus": "guidebook",
+      "query_type": "enumeration",
+      "category": "enumeration",
+      "question": "How many building blocks of AI agents does the guidebook describe?",
+      "expected_answer": "Should state six building blocks.",
+      "relevant_sections": [
+        "6",
+        "six",
+        "building blocks"
+      ],
+      "expected_key_points": [
+        "six",
+        "6"
+      ]
+    }
+  ]
+}

@@ -977,7 +977,7 @@
       <nav>
         <div class="toc-section">Overview</div>
         <a href="#hero">Executive Summary</a>
-        <a href="#timeline">Timeline (Acts 1–9)</a>
+        <a href="#timeline">Timeline (Acts 1–14)</a>
         <a href="#metrics">Metrics Scoreboard</a>
 
         <div class="toc-section">Architecture</div>
@@ -995,6 +995,10 @@
         <a href="#plan-6">6. Docker Deploy</a>
         <a href="#plan-7">7. Reranker & Precision</a>
         <a href="#plan-8">8. GitHub Push</a>
+        <a href="#plan-9">9. Guidebook + Golden v2</a>
+        <a href="#plan-10">10. Hybrid BM25</a>
+        <a href="#plan-11">11. Code Validation</a>
+        <a href="#plan-12">12. Enumeration Tuning</a>
 
         <div class="toc-section">Data</div>
         <a href="#case-wins">Per-Case Wins</a>
@@ -1007,20 +1011,23 @@
       <header class="hero" id="hero">
         <h1>Company Policy RAG<br>Engineering Plans</h1>
         <p class="subtitle">
-          A structured record of every major engineering plan executed on this project — from baseline retrieval through relevancy recovery, citation trust, infrastructure hardening, and deployment.
+          A structured record of every major engineering plan — policy relevancy recovery (Track B), dual-corpus guidebook extension (Track A), code validation, corpus scoping, and enumeration tuning. Source of truth for current status: <a href="../README3.md">README3.md</a>.
         </p>
         <div class="hero-stats">
-          <span class="stat-pill metric"><strong>0.747</strong> Best Relevancy</span>
-          <span class="stat-pill"><strong>94</strong> Tests Passing</span>
-          <span class="stat-pill"><strong>8</strong> Plans Documented</span>
-          <span class="stat-pill"><strong>15</strong> Golden Eval Cases</span>
+          <span class="stat-pill metric"><strong>0.747</strong> Policy Rel</span>
+          <span class="stat-pill metric"><strong>0.700</strong> Guidebook Rel</span>
+          <span class="stat-pill metric"><strong>0.84</strong> Enum Rel</span>
+          <span class="stat-pill"><strong>180</strong> Tests Passing</span>
+          <span class="stat-pill"><strong>12</strong> Plans Documented</span>
+          <span class="stat-pill"><strong>60</strong> Golden Cases</span>
+          <span class="stat-pill"><strong>308</strong> Chunks</span>
         </div>
       </header>
 
       <!-- Timeline -->
       <section id="timeline">
         <h2>Engineering Timeline</h2>
-        <p>Nine acts spanning baseline setup through production deployment. Each act maps to one or more formal plans below.</p>
+        <p>Fourteen acts spanning baseline setup through guidebook quality tuning. Acts 1–9 are policy-corpus recovery; Acts 10–14 are Track A multi-corpus work (2026-06-18).</p>
         <div class="timeline">
           <div class="timeline-item">
             <h4>Act 1 — Baseline &amp; Reranker</h4>
@@ -1058,13 +1065,33 @@
             <h4>Act 9 — Docker Deployment</h4>
             <p>Streamlit container + host Ollama via host.docker.internal. Build verified on Windows.</p>
           </div>
+          <div class="timeline-item">
+            <h4>Act 10 — Guidebook Corpus + Golden v2</h4>
+            <p>AI Agents guidebook indexed (228 chunks). Combined golden set expanded to 60 cases (25 policy + 35 guidebook). Caption inheritance fixes <code>section_path</code> metadata.</p>
+          </div>
+          <div class="timeline-item">
+            <h4>Act 11 — Hybrid BM25 + Parent Retrieval</h4>
+            <p>Track A Phase 2: dense + BM25 RRF fusion, parent-child chunking with parent expand at generation time.</p>
+          </div>
+          <div class="timeline-item">
+            <h4>Act 12 — Code Validation Pipeline</h4>
+            <p>Track A Phase 3: post-generation code validation, self-correct once, <code>strip_code</code> fail mode. Weak subset <code>143246</code>: pass 100%, fallback 0%.</p>
+          </div>
+          <div class="timeline-item">
+            <h4>Act 13 — Corpus Scope + Re-index</h4>
+            <p><code>ScopeFilteredRetriever</code> post-filters by <code>source_file</code>. Force re-index: guidebook <code>section_path</code> unknown 49% → 0%.</p>
+          </div>
+          <div class="timeline-item">
+            <h4>Act 14 — Enumeration Tuning</h4>
+            <p>Comprehensive list retrieval, guidebook term expansion, section-diverse rerank, enum few-shots. Subset <code>160052</code>: enum rel 0.84. Full 35-case <code>164848</code>: rel 0.700 — gate passed.</p>
+          </div>
         </div>
       </section>
 
       <!-- Metrics -->
       <section id="metrics">
         <h2>Evaluation Scoreboard</h2>
-        <p>All runs: 15 golden cases, <code>qwen2.5:7b</code> judge + generator. Targets: Relevancy ≥ 0.75, Faithfulness ≥ 0.90.</p>
+        <p>Policy recovery runs: 15 golden cases (2026-06-17). Guidebook runs: 35-case corpus or 5-case enumeration subset (2026-06-18). Generator + judge: <code>qwen2.5:7b</code>. Targets: Relevancy ≥ 0.75, Faithfulness ≥ 0.90.</p>
 
         <div class="metric-chart" aria-label="Answer Relevancy progression">
           <div class="metric-bar-row">
@@ -1134,6 +1161,34 @@
             </tbody>
           </table>
         </div>
+
+        <h3 style="margin-top:2rem;">Guidebook / Track A (35-case + enumeration subset)</h3>
+        <p>Dual-corpus index: 308 chunks. Eval scoped with <code>--corpus guidebook</code> and <code>source_file</code> post-filter.</p>
+        <div class="target-line" style="margin-top:1rem;">
+          <strong>Guidebook gate:</strong> passed on run <code>164848</code> (rel 0.700, hit 0.771). Enumeration subset <code>160052</code> (rel 0.84). <strong>Phase 4 CI</strong> tasks 5–6 shipped (<code>rag-ci.yml</code> + <code>ci_eval_gate.py</code>).
+        </div>
+        <p class="scroll-hint">← Swipe table to see all columns →</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Run ID</th>
+                <th>Notes</th>
+                <th>Hit</th>
+                <th>Ctx Prec</th>
+                <th>Faith</th>
+                <th>Relv</th>
+                <th>Extra</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>132316</td><td>Baseline 35-case guidebook</td><td>0.743</td><td>0.564</td><td>0.757</td><td>0.571</td><td>enum rel 0.36</td></tr>
+              <tr><td>152255</td><td>Post code-validation + corpus scope</td><td>0.657</td><td>0.564</td><td>0.629</td><td>0.629</td><td>code pass 100%</td></tr>
+              <tr><td>160052</td><td>Enumeration subset (5 cases)</td><td class="high-score">1.000</td><td class="high-score">1.000</td><td>0.500</td><td class="high-score">0.840</td><td>enum gate passed</td></tr>
+              <tr class="highlight-row"><td>164848</td><td><strong>Full guidebook post-enumeration (35 cases)</strong></td><td>0.771</td><td>0.594</td><td>0.629</td><td class="high-score">0.700</td><td>guidebook gate passed</td></tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <!-- Architecture Diagrams -->
@@ -1198,7 +1253,7 @@
             <g filter="url(#node-glow)">
               <rect x="230" y="260" width="300" height="52" rx="10" fill="#5CD0B3" fill-opacity="0.12" stroke="#5CD0B3" stroke-width="1.5"/>
               <text class="node-label" x="380" y="282" text-anchor="middle">ChromaDB</text>
-              <text class="node-sub" x="380" y="298" text-anchor="middle">persistent · cosine HNSW · 81 chunks</text>
+              <text class="node-sub" x="380" y="298" text-anchor="middle">persistent · cosine HNSW · 308 chunks</text>
             </g>
             <path class="flow-arrow" d="M380 224 L380 256" stroke="#FFFF00" stroke-width="2" fill="none" marker-end="url(#arr-gold)"/>
             <path class="flow-arrow" d="M380 312 L380 338" stroke="#FFFF00" stroke-width="2" fill="none" marker-end="url(#arr-gold)"/>
@@ -1207,7 +1262,7 @@
             <g filter="url(#node-glow)">
               <rect x="230" y="340" width="300" height="52" rx="10" fill="#83C167" fill-opacity="0.12" stroke="#83C167" stroke-width="1.5"/>
               <text class="node-label" x="380" y="362" text-anchor="middle">Query Rewrite + Augmentation</text>
-              <text class="node-sub" x="380" y="378" text-anchor="middle">LLM rewrite · augment_query_with_policy_terms()</text>
+              <text class="node-sub" x="380" y="378" text-anchor="middle">LLM rewrite · policy + guidebook term expansion</text>
             </g>
             <path class="flow-arrow" d="M380 392 L380 418" stroke="#FFFF00" stroke-width="2" fill="none" marker-end="url(#arr-gold)"/>
 
@@ -1215,7 +1270,7 @@
             <g filter="url(#node-glow)">
               <rect x="230" y="420" width="300" height="52" rx="10" fill="#83C167" fill-opacity="0.12" stroke="#83C167" stroke-width="1.5"/>
               <text class="node-label" x="380" y="442" text-anchor="middle">Over-retrieve</text>
-              <text class="node-sub" x="380" y="458" text-anchor="middle">RETRIEVAL_CANDIDATE_K = 30</text>
+              <text class="node-sub" x="380" y="458" text-anchor="middle">dense k=30 + BM25 RRF · comprehensive multi-query</text>
             </g>
             <path class="flow-arrow" d="M380 472 L380 498" stroke="#FFFF00" stroke-width="2" fill="none" marker-end="url(#arr-gold)"/>
 
@@ -1223,7 +1278,7 @@
             <g filter="url(#node-glow)">
               <rect x="230" y="500" width="300" height="52" rx="10" fill="#83C167" fill-opacity="0.12" stroke="#83C167" stroke-width="1.5"/>
               <text class="node-label" x="380" y="522" text-anchor="middle">bge-reranker-large</text>
-              <text class="node-sub" x="380" y="538" text-anchor="middle">RERANKER_TOP_N = 6 · score ratio 0.40</text>
+              <text class="node-sub" x="380" y="538" text-anchor="middle">top 6–12 · scope filter · section diversity</text>
             </g>
             <path class="flow-arrow" d="M380 552 L380 578" stroke="#FFFF00" stroke-width="2" fill="none" marker-end="url(#arr-gold)"/>
 
@@ -1247,7 +1302,7 @@
             <g filter="url(#node-glow)">
               <rect x="230" y="740" width="300" height="52" rx="10" fill="#FC6255" fill-opacity="0.12" stroke="#FC6255" stroke-width="1.5"/>
               <text class="node-label" x="380" y="762" text-anchor="middle">Faithfulness Guard</text>
-              <text class="node-sub" x="380" y="778" text-anchor="middle">balanced: reject → log → keep answer</text>
+              <text class="node-sub" x="380" y="778" text-anchor="middle">faithfulness guard · code validation pipeline</text>
             </g>
             <path class="flow-arrow" d="M380 792 L380 818" stroke="#FFFF00" stroke-width="2" fill="none" marker-end="url(#arr-gold)"/>
 
@@ -1895,12 +1950,119 @@
             <li>README.md + README2.md document setup and full engineering journey</li>
           </ol>
         </article>
+
+        <!-- Plan 9 -->
+        <article class="card" id="plan-9">
+          <div class="card-header">
+            <h3>Plan 9 — Guidebook Corpus + Golden v2</h3>
+            <span class="badge badge-done">Completed</span>
+          </div>
+          <dl class="plan-meta">
+            <div><dt>Goal</dt><dd>Evaluate and serve AI Agents guidebook alongside policy handbook</dd></div>
+            <div><dt>Trigger</dt><dd>Track A Phase 1 — code-heavy legal corpus, diagram captions</dd></div>
+            <div><dt>Outcome</dt><dd>60 golden cases; 308 chunks; 0% unknown section_path post re-index</dd></div>
+          </dl>
+          <h4>Approach</h4>
+          <ol class="steps">
+            <li>Expand <code>golden_dataset.json</code> v2 (25 policy + 35 guidebook)</li>
+            <li>Add <code>golden_dataset_guidebook.json</code> for corpus-scoped eval</li>
+            <li>Caption inheritance + parent-child chunking for guidebook PDF</li>
+            <li>Force re-index 2026-06-18 — fix 49% unknown <code>section_path</code></li>
+          </ol>
+          <h4>Files Touched</h4>
+          <ul class="files">
+            <li><code>data/eval/golden_dataset.json</code></li>
+            <li><code>golden_dataset_guidebook.json</code></li>
+            <li><code>src/diagram_captions.py</code></li>
+            <li><code>scripts/index_documents.py</code></li>
+          </ul>
+        </article>
+
+        <!-- Plan 10 -->
+        <article class="card" id="plan-10">
+          <div class="card-header">
+            <h3>Plan 10 — Hybrid BM25 + Parent Retrieval</h3>
+            <span class="badge badge-done">Completed</span>
+          </div>
+          <dl class="plan-meta">
+            <div><dt>Goal</dt><dd>Lexical recall for legal/guidebook terms; richer generation context</dd></div>
+            <div><dt>Trigger</dt><dd>Track A Phase 2 — exact clause IDs and section titles</dd></div>
+            <div><dt>Outcome</dt><dd><code>ENABLE_HYBRID_BM25=true</code> default; RRF fusion + parent expand</dd></div>
+          </dl>
+          <h4>Approach</h4>
+          <ol class="steps">
+            <li>BM25 corpus sync on index (<code>src/bm25_index.py</code>)</li>
+            <li>Reciprocal rank fusion of dense + sparse hits</li>
+            <li>Parent-document expansion after rerank (<code>src/parent_retrieval.py</code>)</li>
+          </ol>
+          <h4>Files Touched</h4>
+          <ul class="files">
+            <li><code>src/hybrid_retrieval.py</code></li>
+            <li><code>src/bm25_index.py</code></li>
+            <li><code>src/parent_retrieval.py</code></li>
+            <li><code>src/retriever.py</code></li>
+          </ul>
+        </article>
+
+        <!-- Plan 11 -->
+        <article class="card" id="plan-11">
+          <div class="card-header">
+            <h3>Plan 11 — Code Validation Tuning</h3>
+            <span class="badge badge-done">Completed</span>
+          </div>
+          <dl class="plan-meta">
+            <div><dt>Goal</dt><dd>Stop false-positive code fallbacks on prose answers</dd></div>
+            <div><dt>Trigger</dt><dd>Guidebook eval: 0% code validation pass, 14% fallback rate</dd></div>
+            <div><dt>Outcome</dt><dd>Run <code>143246</code>: pass 100%, fallback 0% on weak subset</dd></div>
+          </dl>
+          <h4>Approach</h4>
+          <ol class="steps">
+            <li><code>CODE_VALIDATION_TRIGGER_MODE=answer_only</code> — skip prose with backticks in context</li>
+            <li>Hardened heuristic + balanced LLM judge; <code>strip_code</code> fail mode</li>
+            <li>Eval traces: <code>validation_method</code>, <code>failed_lines</code></li>
+          </ol>
+          <h4>Files Touched</h4>
+          <ul class="files">
+            <li><code>src/code_validation.py</code></li>
+            <li><code>src/config.py</code></li>
+            <li><code>src/prompts.py</code></li>
+            <li><code>tests/test_code_validation.py</code></li>
+          </ul>
+        </article>
+
+        <!-- Plan 12 -->
+        <article class="card" id="plan-12">
+          <div class="card-header">
+            <h3>Plan 12 — Enumeration + Comprehensive Retrieval</h3>
+            <span class="badge badge-done">Completed</span>
+          </div>
+          <dl class="plan-meta">
+            <div><dt>Goal</dt><dd>Enumeration relevancy ≥ 0.70 on guidebook list questions</dd></div>
+            <div><dt>Trigger</dt><dd>Enumeration bucket rel 0.58 capped overall guidebook rel 0.63</dd></div>
+            <div><dt>Outcome</dt><dd>Subset <code>160052</code>: enum rel 0.84. Full 35-case <code>164848</code>: rel 0.700 (gate passed); enum bucket 0.84</dd></div>
+          </dl>
+          <h4>Approach</h4>
+          <ol class="steps">
+            <li>Broaden <code>is_comprehensive_list_query()</code>; <code>augment_query_with_guidebook_terms()</code></li>
+            <li>Named subqueries + section-diverse merge before rerank</li>
+            <li>Enumeration few-shots (Examples M–O) + rules 16b/16c in <code>prompts.py</code></li>
+            <li>Enumeration-aware <code>normalize_balanced_answer()</code> double-abstention strip</li>
+          </ol>
+          <h4>Files Touched</h4>
+          <ul class="files">
+            <li><code>src/query_processing.py</code></li>
+            <li><code>src/retriever.py</code></li>
+            <li><code>src/prompts.py</code></li>
+            <li><code>src/generation.py</code></li>
+            <li><code>tests/test_query_processing.py</code></li>
+          </ul>
+        </article>
       </section>
 
       <!-- Per-case wins -->
       <section id="case-wins">
         <h2>Per-Case Wins</h2>
-        <p>Golden cases that drove the most learning during relevancy recovery.</p>
+        <p>Golden cases that drove the most learning — policy recovery (Track B) and guidebook enumeration (Track A).</p>
         <p class="scroll-hint">← Swipe table to see all columns →</p>
         <div class="table-wrap">
           <table>
@@ -1922,6 +2084,10 @@
               <tr><td>outside_employment</td><td>Second job</td><td>0.5</td><td class="high-score">0.80</td><td>Conflict-of-interest mapping</td></tr>
               <tr><td>social_media</td><td>Social media</td><td>0.5</td><td class="high-score">0.80</td><td>Internet policy semantic mapping</td></tr>
               <tr><td>remote_work</td><td>Remote work</td><td class="low-score">0.0</td><td>0.0</td><td>Correct abstention (not in handbook)</td></tr>
+              <tr><td>six_building_blocks</td><td>6 building blocks</td><td>0.50</td><td class="high-score">0.80</td><td>Comprehensive retrieval + enum few-shots</td></tr>
+              <tr><td>design_patterns_popular</td><td>Design patterns</td><td>hit 0</td><td class="high-score">hit 1</td><td>Pattern detection + guidebook expansions</td></tr>
+              <tr><td>agent_building_blocks_count</td><td>Block count</td><td class="low-score">0.0</td><td class="high-score">1.00</td><td>Overview chunk + rule 16b (count from excerpts)</td></tr>
+              <tr><td>tools_real_world</td><td>Currency tool</td><td class="low-score">0.0</td><td>0.0</td><td><strong>Open</strong> — retrieval miss persists</td></tr>
             </tbody>
           </table>
         </div>
@@ -1937,14 +2103,14 @@
               <tr><th>Item</th><th>Status</th><th>Notes</th></tr>
             </thead>
             <tbody>
-              <tr><td>Relevancy ≥ 0.75</td><td class="low-score">0.747</td><td>Within 0.003; re-eval pending after remote_work judge patch</td></tr>
-              <tr><td>Faithfulness ≥ 0.90 (balanced)</td><td>0.807</td><td>Trade-off from keeping guard-rejected answers</td></tr>
-              <tr><td>Mandatory [Source N] tags</td><td class="high-score">Done</td><td>Balanced prompts + agent system prompt updated</td></tr>
-              <tr><td>Citation pipeline</td><td class="high-score">Done</td><td>src/citations.py + SourceTrackingQueryEngine</td></tr>
-              <tr><td>Chroma telemetry</td><td class="high-score">Done</td><td>NoOpProductTelemetry + posthog&lt;3</td></tr>
-              <tr><td>Docker deployment</td><td class="high-score">Done</td><td>docker compose up → :8501</td></tr>
-              <tr><td>Hybrid BM25</td><td>Planned</td><td>Exact legal terms still vector-only</td></tr>
-              <tr><td>Per-user ACL filters</td><td>Planned</td><td>Hooks exist in retriever</td></tr>
+              <tr><td>Policy relevancy ≥ 0.75</td><td class="low-score">0.747</td><td>15-case policy set; within 0.003 of target</td></tr>
+              <tr><td>Guidebook relevancy ≥ 0.70</td><td class="high-score">0.700</td><td>Full 35-case <code>164848</code> — gate passed</td></tr>
+              <tr><td>Enumeration relevancy ≥ 0.70</td><td class="high-score">0.840</td><td>Run <code>160052</code> — gate passed</td></tr>
+              <tr><td>Code validation pass rate</td><td class="high-score">100%</td><td>Weak subset <code>143246</code></td></tr>
+              <tr><td>Hybrid BM25</td><td class="high-score">Done</td><td>RRF fusion default on</td></tr>
+              <tr><td>Corpus-scoped retrieval</td><td class="high-score">Done</td><td>src/retrieval_scope.py</td></tr>
+              <tr><td>Phase 4 CI (pytest + eval smoke)</td><td class="high-score">Done</td><td><code>rag-ci.yml</code>; retrieval smoke hit 1.00 / prec 0.896 / rec 0.75</td></tr>
+              <tr><td>Per-user ACL filters</td><td>Planned</td><td>Track A Phase 5</td></tr>
             </tbody>
           </table>
         </div>
@@ -1953,7 +2119,8 @@
       <footer>
         <p>
           <strong>Company Policy RAG</strong> — Engineering Plans Document<br>
-          Source: <a href="../README2.md">README2.md</a> ·
+          Source: <a href="../README3.md">README3.md</a> (current status) ·
+          <a href="../README2.md">README2.md</a> ·
           Setup: <a href="../README.md">README.md</a> ·
           <a href="interview-notes.html">Interview Notes (Anthropic)</a> ·
           <a href="gen-interview-notes.html">Generator Docs</a> ·

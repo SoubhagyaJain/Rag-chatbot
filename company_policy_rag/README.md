@@ -4,7 +4,8 @@ Production-minded **Retrieval-Augmented Generation** for company policies and le
 
 Built for teams that need **grounded answers with verifiable `[Source N]` citations** — not demo RAG that hallucinates confidently.
 
-For the full engineering journey (metric regressions, fixes, lessons), see [README2.md](README2.md).
+For the full engineering journey (metric regressions, fixes, lessons), see [README2.md](README2.md).  
+For **progress status, validation gaps, and remaining work**, see [README3.md](README3.md).
 
 ---
 
@@ -19,7 +20,9 @@ For the full engineering journey (metric regressions, fixes, lessons), see [READ
 | Streamlit UI | **Stable** | Primary internal tool; chat, sidebar, expandable citations |
 | Docker deployment | **Stable** | Streamlit container + host Ollama via `host.docker.internal` |
 | Evaluation framework | **Stable** | Golden set, trend logging to `logs/evaluation_results.json` |
-| Hybrid BM25 retrieval | **Planned** | Dense-only today |
+| Hybrid BM25 retrieval | **Stable** | Dense + BM25 RRF fusion (on by default) |
+| Parent-document retrieval | **Stable** | Rank on children, expand to parent context |
+| Code validation (Phase 3) | **Stable** | Heuristic + LLM judge, self-correct once, low-confidence fallback |
 | ACL / metadata filters | **Planned** | Hooks exist; not enforced per-user |
 
 This is a **serious engineering baseline**, not a toy chatbot. Expect to tune on your own documents and re-run eval after every pipeline change.
@@ -60,7 +63,7 @@ This is a **serious engineering baseline**, not a toy chatbot. Expect to tune on
 - **Answer Relevancy varies** — strict grounding hit 1.0 faithfulness but ~0.42 relevancy (over-abstention). Balanced mode trades some faithfulness for usefulness; tune via eval.
 - **Recall can drop with tight reranking** — high precision often means fewer chunks reach the LLM; edge cases may miss sections.
 - **Document quality is everything** — scanned PDFs, missing sections, or outdated handbooks limit what any RAG stack can do.
-- **No hybrid search yet** — exact legal terms (statute numbers, clause IDs) may miss without BM25.
+- **Hybrid BM25 is on by default** — disable with `ENABLE_HYBRID_BM25=false` for dense-only A/B.
 - **Local LLM limits** — `qwen2.5:7b` is adequate for Q&A; complex multi-document reasoning may need a larger model.
 - **Latency** — reranker + query rewrite + faithfulness guard add seconds per query on CPU.
 
@@ -107,6 +110,15 @@ STRICT_GROUNDING=true
 > The provided documents do not contain sufficient information to answer this question reliably.
 
 The system does **not** invent a pet insurance policy when the handbook is silent. This is intentional for policy/legal use cases.
+
+### Low confidence (code validation fallback)
+
+**User:** *Show me the Python example for loading the config module.*
+
+**Assistant:**
+> I found related excerpts but cannot verify every detail in my answer against the retrieved documents. Please review the cited sources directly or ask a more specific question.
+
+Streamlit shows an info banner when this fallback fires. Triggered only when the answer or retrieved context contains code and validation fails after one self-correction attempt.
 
 ---
 
@@ -269,7 +281,8 @@ flowchart TB
         RERANK --> FILTER[Score filter → top-5]
         FILTER --> GEN[Grounded generation]
         GEN --> GUARD[Faithfulness guard]
-        GUARD --> AGENT[ReAct agent]
+        GUARD --> CODE[Code validation]
+        CODE --> AGENT[ReAct agent]
         AGENT --> CITE[Citation filter by Source N]
         CITE --> UI[Streamlit + citations]
     end
@@ -305,8 +318,10 @@ python scripts/evaluate.py --max-samples 5    # smoke test
 | Context Recall | Golden keywords found in retrieval | > 0.60 |
 | Faithfulness | Answer grounded in context | > 0.80 |
 | Answer Relevancy | Answer addresses the question | > 0.75 |
+| Code validation pass rate | Code answers grounded in context (triggered cases only) | > 0.90 |
+| Low-confidence fallback rate | Share of cases using code-validation fallback | < 0.05 |
 
-Golden cases: `data/eval/golden_dataset.json`. Add questions from your handbook; tune `relevant_sections` to match section titles.
+Golden cases: `data/eval/golden_dataset.json`. Add questions from your handbook; tune `relevant_sections` to match section titles. Per-case `fallback_reason` and `code_validation_passed` isolate Phase 3 regressions.
 
 **Balanced mode targets:** Faithfulness ≥ 0.90, Answer Relevancy ≥ 0.75.
 
@@ -364,15 +379,28 @@ Reranker dominates on CPU (~58% of e2e). Use `bge-reranker-base`, `FAITHFULNESS_
 
 Configure: `ENABLE_SECTION_DETECTION`, `SECTION_DETECTION_MODE` (`standard` / `strict` / `permissive`). Re-index after changes.
 
-**Planned:** semantic chunking, layout-aware PDF parsing, parent-child hierarchical retrieval.
+**Phase 1 (stable):** optional Marker PDF parsing (`ENABLE_MARKER_PDF`), hierarchical parent-child chunking (parents in `storage/docstore/`, children in Chroma), code-block protection, diagram caption nodes. Parent-document retrieval at query time is Phase 2.
+
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `ENABLE_HIERARCHICAL_CHUNKING` | true | Parent/child split with code protection |
+| `PARENT_CHUNK_SIZE` | 2000 | Parent aggregate size (docstore) |
+| `CHUNK_SIZE` | 480 | Child embed size (was 640) |
+| `ENABLE_MARKER_PDF` | false | Layout-aware parsing when GPU + marker-pdf installed |
+| `ENABLE_DIAGRAM_CAPTIONS` | true | Index figure captions for diagram queries |
+| `EVAL_CORPUS` | all | Golden eval filter: `policy`, `guidebook`, or `all` |
+
+Golden eval v2: **60 cases** (25 policy + 35 guidebook) in `data/eval/golden_dataset.json`.
 
 ---
 
 ## Retrieval pipeline
 
 ```
-Query → LLM rewrite → Chroma (25) → bge-reranker-large → score filter → top 5 → LLM
+Query → LLM rewrite → Chroma dense (30) + BM25 (30) → RRF fuse → bge-reranker-large → score filter → parent expand → LLM
 ```
+
+Disable hybrid: `ENABLE_HYBRID_BM25=false`. Disable parent expansion: `ENABLE_PARENT_DOCUMENT_RETRIEVAL=false`.
 
 Implemented in `src/retriever.py`. `_PostprocessingRetriever` ensures rerank + filter run on all `.retrieve()` paths (eval, agent, Streamlit).
 
@@ -400,10 +428,17 @@ If precision is low but recall is good:
 ## Faithfulness & grounding
 
 ```
-Retrieved chunks → XML-tagged sources → QA prompt → faithfulness guard → answer
+Retrieved chunks → XML-tagged sources → QA prompt → faithfulness guard → code validation → answer
 ```
 
-Code: `src/prompts.py`, `src/generation.py`.
+When the answer or context contains code (`src/code_validation.py`):
+
+1. **Heuristic check** — every code line in the answer must appear in retrieved context
+2. **LLM judge** — confirms grounding when heuristic is inconclusive
+3. **Self-correct once** — rewrite answer from context on failure
+4. **Low-confidence fallback** — honest partial answer if validation still fails
+
+Code: `src/prompts.py`, `src/generation.py`, `src/code_validation.py`.
 
 - Sources formatted as `<source id="N">[Source N: file.pdf, p.14] — Section …</source>`
 - **Balanced:** synthesize related excerpts; partial answers with *"Based on the available information…"*
@@ -411,6 +446,17 @@ Code: `src/prompts.py`, `src/generation.py`.
 - **Guard:** rejects clear hallucinations (balanced: SUPPORTED/UNSUPPORTED; strict: YES/NO)
 
 Disable guard for A/B only: `FAITHFULNESS_GUARD_MODE=off`.
+
+**Phase 3 env vars** (defaults shown):
+
+```bash
+ENABLE_CODE_VALIDATION=true
+ENABLE_CODE_SELF_CORRECTION=true
+CODE_SELF_CORRECTION_MAX_RETRIES=1
+CODE_VALIDATION_USE_HEURISTIC=true
+```
+
+Disable code validation for A/B: `ENABLE_CODE_VALIDATION=false`.
 
 **Balanced citation rules (mandatory):** Every factual sentence must end with `[Source N]` tags matching `<source id="N">` in the context. The ReAct agent system prompt preserves tags from `policy_search` output. See `src/prompts.py` (`CITATION RULES` block + Example J bad case).
 
@@ -459,6 +505,7 @@ All settings in `src/config.py`, overridable via `.env`. Grouped for scannabilit
 | **Retrieval** | `RETRIEVAL_CANDIDATE_K`, `RERANKER_TOP_N`, `RERANKER_MODEL`, `ENABLE_QUERY_REWRITE` | 30, 6, bge-reranker-large, true |
 | **Rerank filter** | `ENABLE_RERANK_SCORE_FILTER`, `RERANK_MIN_SCORE_RATIO`, `RERANK_MIN_KEEP` | true, 0.40, 3 |
 | **Grounding** | `GROUNDING_STRICTNESS`, `FAITHFULNESS_GUARD_MODE`, `RESPONSE_PROMPT_VERSION` | balanced, balanced, v2_balanced |
+| **Code validation** | `ENABLE_CODE_VALIDATION`, `ENABLE_CODE_SELF_CORRECTION`, `CODE_SELF_CORRECTION_MAX_RETRIES` | true, true, 1 |
 | **Citations** | `SHOW_CITATIONS`, `CITATION_FORMAT`, `CITATION_MIN_RELEVANCE_RATIO` | true, section_first, 0.55 |
 | **Eval** | `EVAL_USE_LLM_JUDGE`, `EVAL_LLM_MODEL` | true, qwen2.5:7b |
 | **Chroma** | `CHROMA_PERSIST_DIR`, `ANONYMIZED_TELEMETRY` | storage/chroma, False |
@@ -478,6 +525,7 @@ company_policy_rag/
 │   ├── chroma_telemetry.py # No-op Chroma telemetry (posthog compat)
 │   ├── retriever.py        # Rewrite → retrieve → rerank → filter
 │   ├── generation.py       # Grounded synthesis + guard + source tracking
+│   ├── code_validation.py  # Code-line validation + self-correction (Phase 3)
 │   ├── citations.py        # [Source N] parsing + citation selection
 │   ├── prompts.py          # Strict / balanced prompts + mandatory citation rules
 │   ├── query_processing.py # LLM rewrite + policy-term augmentation
@@ -514,7 +562,7 @@ company_policy_rag/
 
 | Done | Planned |
 |------|---------|
-| Golden eval, reranker, faithfulness guard, conversation memory | Hybrid BM25 + dense |
+| Golden eval, reranker, faithfulness guard, conversation memory, hybrid BM25, parent retrieval, code validation | Semantic query cache |
 | Chroma incremental indexing | Semantic query cache |
 | Section-aware metadata | Per-team ACL filters |
 | Streamlit UI, citation pipeline, balanced relevancy recovery | Faithfulness ≥ 0.90 without relevancy loss |
