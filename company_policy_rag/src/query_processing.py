@@ -8,6 +8,8 @@ search query without HyDE's hallucination risk on policy text.
 
 from __future__ import annotations
 
+import re
+
 from llama_index.core import Settings
 
 from src.config import settings
@@ -126,3 +128,79 @@ def rewrite_query_for_retrieval(query: str) -> str:
     except Exception as exc:
         logger.warning("Query rewrite failed, using original: %s", exc)
         return query
+
+
+_COMPREHENSIVE_QUERY_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"\blist\b.+\bexplain\b", re.IGNORECASE),
+    re.compile(r"\bbuilding\s+blocks?\b", re.IGNORECASE),
+    re.compile(r"\bpay\s+special\s+attention\b", re.IGNORECASE),
+    re.compile(r"\bfor\s+each\b", re.IGNORECASE),
+    re.compile(r"\ball\s+\d+\b", re.IGNORECASE),
+    re.compile(r"\btypes?\s+of\b.+\binclude\b", re.IGNORECASE),
+)
+
+
+def is_comprehensive_list_query(query: str) -> bool:
+    """True when the user asks for a multi-part list or enumeration from documents."""
+    text = query.strip()
+    if len(text) < 40:
+        return False
+    return any(pattern.search(text) for pattern in _COMPREHENSIVE_QUERY_PATTERNS)
+
+
+def _split_topic_clause(clause: str) -> list[str]:
+    """Split comma-separated topics while keeping parenthetical hints attached."""
+    parts = re.split(r",(?![^()]*\))", clause)
+    topics: list[str] = []
+    for part in parts:
+        cleaned = re.sub(r"\s+", " ", part).strip(" .")
+        if len(cleaned) >= 3:
+            topics.append(cleaned)
+    return topics
+
+
+def build_multi_retrieval_queries(query: str, *, max_queries: int = 8) -> list[str]:
+    """
+    Build supplementary retrieval queries for comprehensive list questions.
+
+    Merges results from each query before reranking so all requested sections
+    (e.g. six AI-agent building blocks) can appear in generation context.
+    """
+    core = query.strip()
+    if not core:
+        return []
+
+    queries: list[str] = [core]
+
+    attention_match = re.search(
+        r"(?:pay\s+special\s+attention\s+to|including|covering|focus\s+on)\s+(.+)",
+        core,
+        re.IGNORECASE,
+    )
+    if attention_match:
+        for topic in _split_topic_clause(attention_match.group(1)):
+            queries.append(f"{topic}")
+
+    blocks_match = re.search(r"\b(\d+)\s+building\s+blocks?\b", core, re.IGNORECASE)
+    if blocks_match:
+        count = int(blocks_match.group(1))
+        subject = "building blocks"
+        subject_match = re.search(
+            r"building\s+blocks?\s+of\s+(.+?)(?:\.|,|$)",
+            core,
+            re.IGNORECASE,
+        )
+        if subject_match:
+            subject = subject_match.group(1).strip()
+        for index in range(1, min(count, 8) + 1):
+            queries.append(f"{subject} building block {index}")
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for item in queries:
+        key = item.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(item)
+    return deduped[:max_queries]

@@ -24,7 +24,11 @@ from src.citations import log_retrieval_stage
 from src.config import settings
 from src.indexing import load_index
 from src.postprocessors import RelativeScoreThresholdPostprocessor
-from src.query_processing import rewrite_query_for_retrieval
+from src.query_processing import (
+    build_multi_retrieval_queries,
+    is_comprehensive_list_query,
+    rewrite_query_for_retrieval,
+)
 from src.timing import get_current_timing, record_stage
 from src.utils import timer
 from src.utils import logger
@@ -55,8 +59,10 @@ def get_initial_top_k() -> int:
     return settings.similarity_top_k
 
 
-def get_final_top_k() -> int:
+def get_final_top_k(*, comprehensive: bool = False) -> int:
     """Chunks ultimately passed to generation after optional rerank + filtering."""
+    if comprehensive and settings.enable_comprehensive_retrieval:
+        return settings.comprehensive_reranker_top_n
     if settings.enable_reranker:
         return settings.reranker_top_n
     return settings.similarity_top_k
@@ -299,6 +305,41 @@ class _PostprocessingRetriever:
 
     def retrieve(self, query: str | QueryBundle) -> list[NodeWithScore]:
         bundle = _to_query_bundle(query)
+        return self._retrieve_bundle(bundle)
+
+    def retrieve_comprehensive(self, raw_query: str) -> list[NodeWithScore]:
+        """Multi-query Chroma retrieval for list/enumeration questions."""
+        sub_queries = build_multi_retrieval_queries(
+            raw_query,
+            max_queries=settings.comprehensive_max_subqueries,
+        )
+        merged: dict[str, NodeWithScore] = {}
+        with timer("chroma_retrieve") as t_chroma:
+            for sub_query in sub_queries:
+                rewritten = preprocess_query(sub_query)
+                bundle = QueryBundle(query_str=rewritten)
+                for node in self._inner.retrieve(bundle):
+                    node_id = node.node.node_id
+                    score = node.score or 0.0
+                    existing = merged.get(node_id)
+                    if existing is None or score > (existing.score or 0.0):
+                        merged[node_id] = node
+        if get_current_timing() is not None:
+            record_stage("chroma_retrieve", t_chroma["elapsed_ms"])
+
+        nodes = list(merged.values())
+        log_retrieval_stage("chroma_retrieved_comprehensive", nodes)
+        primary = QueryBundle(query_str=preprocess_query(raw_query))
+        with timer("rerank_filter") as t_rerank:
+            filtered = apply_postprocessors(nodes, primary, self._postprocessors)
+        if get_current_timing() is not None:
+            record_stage("rerank_filter", t_rerank["elapsed_ms"])
+        top_n = get_final_top_k(comprehensive=True)
+        filtered = filtered[:top_n]
+        log_retrieval_stage("post_rerank_filter", filtered)
+        return filtered
+
+    def _retrieve_bundle(self, bundle: QueryBundle) -> list[NodeWithScore]:
         with timer("chroma_retrieve") as t_chroma:
             nodes = self._inner.retrieve(bundle)
         if get_current_timing() is not None:
@@ -339,12 +380,20 @@ class _QueryRewritingRetriever:
         self._inner = inner_retriever
 
     def retrieve(self, query: str | QueryBundle) -> Any:
+        raw = query.query_str if isinstance(query, QueryBundle) else query
+        if (
+            settings.enable_comprehensive_retrieval
+            and is_comprehensive_list_query(raw)
+            and hasattr(self._inner, "retrieve_comprehensive")
+        ):
+            logger.info("Comprehensive list retrieval enabled for query")
+            return self._inner.retrieve_comprehensive(raw)
+
         if isinstance(query, QueryBundle):
-            raw = query.query_str
             rewritten = preprocess_query(raw)
             bundle = QueryBundle(query_str=rewritten)
         else:
-            bundle = QueryBundle(query_str=preprocess_query(query))
+            bundle = QueryBundle(query_str=preprocess_query(raw))
         return self._inner.retrieve(bundle)
 
     # LlamaIndex QueryEngine may call aretrieve

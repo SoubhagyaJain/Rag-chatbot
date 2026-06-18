@@ -69,10 +69,9 @@ def build_policy_search_tool(index: VectorStoreIndex | None = None) -> QueryEngi
         metadata=ToolMetadata(
             name="policy_search",
             description=(
-                "Search company policy PDFs and legal documents (employee handbook, "
-                "contracts, NDAs, terms of service). Use for any question about "
-                "company rules, benefits, leave policy, legal obligations, or "
-                "document-specific clauses. Input should be a clear natural-language query."
+                "Search all indexed PDFs (employee handbook, legal uploads, guides). "
+                "Use for any question about content in those documents. "
+                "Input should be a clear natural-language query."
             ),
         ),
     )
@@ -152,7 +151,11 @@ async def chat_with_memory(
     citations: list[dict[str, Any]] = []
     if settings.show_citations:
         generation_nodes = get_generation_nodes_this_turn()
-        citations = select_citations_for_answer(answer, generation_nodes)
+        citations = select_citations_for_answer(
+            answer,
+            generation_nodes,
+            user_query=user_message,
+        )
 
     if settings.enable_conversation_memory and memory is not None:
         trim_memory_to_window(memory)

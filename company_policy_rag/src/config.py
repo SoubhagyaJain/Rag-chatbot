@@ -196,6 +196,15 @@ class Settings(BaseSettings):
     pdf_page_thumb_dpi: int = Field(default=120, alias="PDF_PAGE_THUMB_DPI")
     citation_max_page_images: int = Field(default=4, alias="CITATION_MAX_PAGE_IMAGES")
 
+    # ── Comprehensive list retrieval ───────────────────────────────────────
+    enable_comprehensive_retrieval: bool = Field(
+        default=True, alias="ENABLE_COMPREHENSIVE_RETRIEVAL"
+    )
+    comprehensive_reranker_top_n: int = Field(
+        default=10, alias="COMPREHENSIVE_RERANKER_TOP_N"
+    )
+    comprehensive_max_subqueries: int = Field(default=8, alias="COMPREHENSIVE_MAX_SUBQUERIES")
+
     # ── Document taxonomy ──────────────────────────────────────────────────
     # Maps top-level data subfolders → metadata document_type values
     folder_document_types: dict[str, str] = Field(

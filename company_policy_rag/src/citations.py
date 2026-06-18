@@ -16,6 +16,7 @@ from typing import Any, Sequence
 from llama_index.core.schema import NodeWithScore
 
 from src.config import settings
+from src.query_processing import is_comprehensive_list_query
 from src.utils import format_citations, logger, prepare_citations_for_display
 
 # Nodes passed to the LLM during policy_search in the current agent turn.
@@ -122,6 +123,8 @@ def filter_nodes_by_relevance_score(
 def select_citations_for_answer(
     answer: str,
     generation_nodes: list[NodeWithScore],
+    *,
+    user_query: str | None = None,
 ) -> list[dict[str, Any]]:
     """
     Select UI citations from generation nodes only (never a parallel retrieval).
@@ -160,8 +163,11 @@ def select_citations_for_answer(
             generation_nodes,
             settings.citation_min_relevance_ratio,
         )
-        # Precision over recall: fewer sources when answer omits explicit tags.
-        max_fallback = max(1, min(3, settings.citation_max_sources // 2))
+        # Broader fallback for comprehensive list questions; tighter otherwise.
+        if user_query and is_comprehensive_list_query(user_query):
+            max_fallback = settings.citation_max_sources
+        else:
+            max_fallback = max(1, min(3, settings.citation_max_sources // 2))
         selected_nodes = sorted(
             selected_nodes,
             key=lambda n: n.score or 0,
