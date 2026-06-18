@@ -1367,7 +1367,7 @@
   <div class="src-body">
     <div class="src-field"><span class="src-label">Category key</span><code>production</code></div>
     <div class="src-field"><span class="src-label">Why they ask</span><p>MLOps maturity for solo project.</p></div>
-    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>Streamlit UI with index diagnostics; Docker Compose + host Ollama.</li><li>entrypoint.sh: Ollama wait 60s, optional AUTO_INDEX_ON_START.</li><li>180 pytest tests; probe_chroma_index() for health.</li><li>Logs: app.log, citation pipeline, eval JSON, GenerationTrace.</li></ul></div>
+    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>Streamlit UI with index diagnostics; Docker Compose + host Ollama.</li><li>entrypoint.sh: Ollama wait 60s, optional AUTO_INDEX_ON_START.</li><li>182 pytest tests; probe_chroma_index() for health.</li><li>Logs: app.log, citation pipeline, eval JSON, GenerationTrace.</li></ul></div>
     <div class="src-field"><span class="src-label">Code reference</span><code>Dockerfile, docker/entrypoint.sh, app/streamlit_app.py</code></div>
     <div class="src-field"><span class="src-label">Follow-ups</span><ul class="src-follow"><li>CI/CD?</li><li>K8s?</li></ul></div>
   </div>
@@ -1444,7 +1444,7 @@
   <div class="src-body">
     <div class="src-field"><span class="src-label">Category key</span><code>production</code></div>
     <div class="src-field"><span class="src-label">Why they ask</span><p>Calibration — Anthropic values honesty.</p></div>
-    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>No CI/CD pipeline; no automated eval gate on PR — Phase 4 CI is next (guidebook gate passed at 0.700 on run 164848).</li><li>No production drift monitoring; no ACL per user.</li><li>Benchmarked p50/p95 on golden set (53.5s/58.8s e2e) — no live-traffic metrics yet; CPU-only default.</li><li>Hybrid BM25 shipped; guidebook rel gate passed; faithfulness 0.629 still below 0.90 target.</li></ul></div>
+    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>Phase 4 CI shipped: rag-ci.yml (pytest + ci_eval_gate.py retrieval smoke); local smoke PASS; GH runner blocked on billing.</li><li>No production drift monitoring; no ACL per user.</li><li>Benchmarked p50/p95 on golden set (53.5s/58.8s e2e) — no live-traffic metrics yet; CPU-only default.</li><li>Hybrid BM25 shipped; guidebook rel gate passed; faithfulness 0.629 still below 0.90 target.</li></ul></div>
     <div class="src-field"><span class="src-label">Code reference</span><code>README2 open items</code></div>
     <div class="src-field"><span class="src-label">Follow-ups</span><ul class="src-follow"><li>First priority if hired?</li><li>90-day roadmap?</li></ul></div>
   </div>
@@ -1543,7 +1543,7 @@
   <div class="src-body">
     <div class="src-field"><span class="src-label">Category key</span><code>tradeoffs</code></div>
     <div class="src-field"><span class="src-label">Why they ask</span><p>Prioritization.</p></div>
-    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>Phase 4 CI: pytest + stratified eval smoke (enumeration + code cases).</li><li>Full guidebook re-eval to confirm rel ≥ 0.70 before locking CI thresholds.</li><li>Independent Claude-as-judge; faithfulness recovery without relevancy loss.</li><li>Live-traffic p95 dashboard (golden-set benchmark done: 58.8s e2e p95).</li></ul></div>
+    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>Phase 4 CI done — next: faithfulness recovery on guidebook (0.629 → 0.90) without relevancy loss.</li><li>Independent Claude-as-judge for faithfulness scoring.</li><li>Semantic query cache + timing dashboard (Phase 4 tasks 7–8, deferred).</li><li>Live-traffic p95 dashboard (golden-set benchmark done: 58.8s e2e p95).</li></ul></div>
     <div class="src-field"><span class="src-label">Code reference</span><code>README2 roadmap</code></div>
     <div class="src-field"><span class="src-label">Follow-ups</span><ul class="src-follow"><li>What would you cut?</li><li>Ship vs perfect?</li></ul></div>
   </div>

@@ -111,16 +111,15 @@ Short-horizon metric recovery after strict-grounding over-abstention regression 
 | “Phase 3 relevancy judge” | **Track B** — `evaluation.py` judge + `RERANKER_TOP_N=6` |
 | “Phase 4” without context | **Ask** — Track A (prod reliability) vs Track B (normalization, run `104356`) |
 
-### Documentation drift (known)
+### Documentation drift (resolved 2026-06-18 session close)
 
-| Doc | Stale claim | Actual state |
-|-----|-------------|--------------|
-| README2.md | “94 tests” | **180 tests** |
-| README2.md | “Hybrid BM25: Planned” | **Shipped** — `ENABLE_HYBRID_BM25=true` default |
-| README2.md | “15-case golden set” | **60 cases** in v2 dataset (+ top-level guidebook file) |
-| README.md | “94 tests” in project structure | **180 tests** |
+| Doc | Was stale | Now |
+|-----|-----------|-----|
+| README2.md | “94 tests”, “15-case golden set” | **182 tests**, **60 cases** |
+| README.md | “94 tests” in project structure | **182 tests** + CI/smoke section |
+| All READMEs | Phase 4 CI “planned” | **Shipped** — see §7 tasks 5–6 |
 
-README3 is the source of truth for **current** completion status until README/README2 are refreshed.
+README3 remains the source of truth for completion status and backlog priority.
 
 ---
 
@@ -468,9 +467,9 @@ flowchart TB
 
 | Window | Focus | Deliverables |
 |--------|-------|--------------|
-| **Days 1–30** | Close validation debt | 60-case + guidebook eval; README3 §5 updated; guidebook section metadata fix |
-| **Days 31–60** | Phase 4 reliability | CI pytest + eval smoke; semantic cache prototype; faithfulness recovery experiments |
-| **Days 61–90** | Phase 5 + polish | ACL filter prototype; nightly golden run; staging latency dashboard; README2 refresh |
+| **Days 1–30** | **Done** — validation + CI | Guidebook gate `164848` (rel 0.700); Phase 4 CI tasks 5–6 shipped; local smoke PASS |
+| **Days 31–60** | Faithfulness recovery | Guidebook faith 0.629 → ≥0.75 without relevancy loss; independent judge experiments |
+| **Days 61–90** | Phase 4 remainder + Phase 5 | Semantic cache (task 7); timing dashboard (task 8); ACL filter prototype; nightly golden run |
 
 ### Decision gates
 
@@ -478,7 +477,7 @@ flowchart TB
 |------|------------------|
 | **Internal beta** | 60-case eval logged; no P0 retrieval misses on policy factual cases |
 | **Guidebook GA** | Guidebook eval: relevancy ≥ 0.70, code validation pass ≥ 0.85 |
-| **Production pilot** | CI gate live; p95 e2e < 15s (GPU) or documented SLA; ACL for legal vs HR |
+| **Production pilot** | CI gate live on GitHub (wired + locally verified; GH runner pending billing fix); p95 e2e < 15s (GPU) or documented SLA; ACL for legal vs HR |
 
 ---
 
@@ -508,6 +507,7 @@ python -c "import json; d=json.load(open('logs/evaluation_results.json')); r=d['
 |------|--------|
 | 2026-06-18 | Initial README3 — dual phase frameworks, validation debt documented, 308-chunk snapshot |
 | 2026-06-18 | P0 complete — baseline evals `132316`/`133725`, guidebook re-index (0% unknown `section_path`), weak subset `140509`, failure buckets in §5 |
+| 2026-06-18 | Session close — Phase 4 CI tasks 5–6 (`085d957`); local smoke hit 1.00 / prec 0.896 / rec 0.75; 182 tests; GH Actions blocked on billing |
 
 ---
 
@@ -515,9 +515,9 @@ python -c "import json; d=json.load(open('logs/evaluation_results.json')); r=d['
 
 | Question | Answer |
 |----------|--------|
-| **How far have we come?** | Full local RAG stack; Tracks A.1–3 and B.1–6 complete; P0 evals logged; guidebook metadata fixed (0% unknown `section_path`). |
-| **How much is left?** | ~25% to production pilot: **quality tuning (P3)**, then CI/cache/monitoring (P1), ACL/GPU (P2). |
-| **Biggest gap?** | **Code validation 0% pass rate** and guidebook relevancy **0.57** (baseline) — metadata alone insufficient. |
-| **Next action?** | P3: tune `src/code_validation.py` + add corpus-scoped retrieval filter; re-run weak subset before full guidebook eval. |
+| **How far have we come?** | Full local RAG stack; Tracks A.1–3 and B.1–6 complete; guidebook rel gate **0.700** (`164848`); Phase 4 CI shipped (pytest + retrieval smoke). |
+| **How much is left?** | ~20% to production pilot: **faithfulness recovery (P3)**, then cache/dashboard (tasks 7–8), ACL/GPU (P2). |
+| **Biggest gap?** | Guidebook **faithfulness 0.629** vs 0.90 target; code-query relevancy **0.525** on full guidebook run. |
+| **Next action?** | Faithfulness tuning on worst-case guidebook buckets; keep relevancy ≥ 0.70; run `ci_eval_gate.py` locally until GH billing fixed. |
 
 For setup and tuning, see [README.md](README.md). For why each decision was made, see [README2.md](README2.md).

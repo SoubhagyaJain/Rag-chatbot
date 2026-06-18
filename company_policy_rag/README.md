@@ -262,6 +262,23 @@ Run commands from this directory (or set `POLICY_RAG_ROOT` to its path) so `data
 pytest tests/ -v
 ```
 
+### CI / quality gates
+
+GitHub Actions workflow: [`.github/workflows/rag-ci.yml`](../.github/workflows/rag-ci.yml) — `unit-tests` (182 pytest) + `eval-smoke` (retrieval-only gate on 8-case stratified subset).
+
+**Local smoke** (same as CI `eval-smoke` job):
+
+```bash
+cd company_policy_rag
+# PowerShell:
+$env:ENABLE_QUERY_REWRITE="false"
+python scripts/ci_eval_gate.py
+```
+
+Dataset: `data/eval/golden_subset_ci_smoke.json`. Floors: `data/eval/ci_smoke_baseline.json` (hit ≥ 0.75, precision ≥ 0.50, recall ≥ 0.55).
+
+> **Note:** GitHub Actions may not run until account billing is resolved at https://github.com/settings/billing. Use the local gate above in the meantime.
+
 ---
 
 ## Architecture
@@ -551,7 +568,7 @@ company_policy_rag/
 │   └── eval/golden_dataset.json
 ├── storage/chroma/         # Vector store (runtime)
 ├── logs/                   # app.log, evaluation_results.json
-└── tests/                  # 94 tests
+└── tests/                  # 182 tests
 ```
 
 ---

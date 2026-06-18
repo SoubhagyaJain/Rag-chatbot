@@ -224,7 +224,7 @@ add_qs("production", [
     ("How did you productionize this?", "MLOps maturity for solo project.",
      ["Streamlit UI with index diagnostics; Docker Compose + host Ollama.",
       "entrypoint.sh: Ollama wait 60s, optional AUTO_INDEX_ON_START.",
-      "180 pytest tests; probe_chroma_index() for health.",
+      "182 pytest tests; probe_chroma_index() for health.",
       "Logs: app.log, citation pipeline, eval JSON, GenerationTrace."],
      "Dockerfile, docker/entrypoint.sh, app/streamlit_app.py", ["CI/CD?", "K8s?"], "production"),
     ("Tell me about the citation trust bug.", "Production battle story.",
@@ -262,7 +262,7 @@ add_qs("production", [
       "Streamlit binds 0.0.0.0 — required for port mapping."],
      "docker-compose.yml, .streamlit/config.toml", ["Ollama in-compose variant?", "Model versioning?"], "production"),
     ("What's missing for true production?", "Calibration — Anthropic values honesty.",
-     ["No CI/CD pipeline; no automated eval gate on PR — Phase 4 CI is next (guidebook gate passed at 0.700 on run 164848).",
+     ["Phase 4 CI shipped: rag-ci.yml (pytest + ci_eval_gate.py retrieval smoke); local smoke PASS; GH runner blocked on billing.",
       "No production drift monitoring; no ACL per user.",
       "Benchmarked p50/p95 on golden set (53.5s/58.8s e2e) — no live-traffic metrics yet; CPU-only default.",
       "Hybrid BM25 shipped; guidebook rel gate passed; faithfulness 0.629 still below 0.90 target."],
@@ -317,9 +317,9 @@ add_qs("tradeoffs", [
       "Limitation: same model family — note in interview."],
      "evaluation.py judge_answer_relevancy", ["Inter-rater agreement?", "Claude as judge?"], "tradeoffs"),
     ("If you had 2 more weeks?", "Prioritization.",
-     ["Phase 4 CI: pytest + stratified eval smoke (enumeration + code cases).",
-      "Full guidebook re-eval to confirm rel ≥ 0.70 before locking CI thresholds.",
-      "Independent Claude-as-judge; faithfulness recovery without relevancy loss.",
+     ["Phase 4 CI done — next: faithfulness recovery on guidebook (0.629 → 0.90) without relevancy loss.",
+      "Independent Claude-as-judge for faithfulness scoring.",
+      "Semantic query cache + timing dashboard (Phase 4 tasks 7–8, deferred).",
       "Live-traffic p95 dashboard (golden-set benchmark done: 58.8s e2e p95)."],
      "README2 roadmap", ["What would you cut?", "Ship vs perfect?"], "tradeoffs"),
     ("Biggest suboptimal decision?", "Credibility question.",
@@ -713,8 +713,8 @@ html = f'''<!DOCTYPE html>
             <li><strong>Serving:</strong> Streamlit :8501; Docker Compose + host Ollama</li>
             <li><strong>Reliability:</strong> fail-open rewrite, reranker graceful degradation, probe_chroma_index(), citation score fallback capped</li>
             <li><strong>Observability:</strong> app.log, citation pipeline stages, eval JSON append-only</li>
-            <li><strong>Tests:</strong> 180 pytest across generation, citations, prompts, eval, chroma, code validation, retrieval scope</li>
-            <li><strong>Gaps (say honestly):</strong> no CI/CD (Phase 4 deferred), no drift monitoring, no live-traffic p50/p95 (golden-set benchmark: 53.5s e2e p50), CPU-only default</li>
+            <li><strong>Tests:</strong> 182 pytest across generation, citations, prompts, eval, chroma, code validation, retrieval scope</li>
+            <li><strong>Gaps (say honestly):</strong> GH Actions blocked on billing (local ci_eval_gate.py PASS); no drift monitoring; no live-traffic p50/p95 (golden-set benchmark: 53.5s e2e p50), CPU-only default</li>
           </ul>
         </div>
       </section>
@@ -765,8 +765,8 @@ html = f'''<!DOCTYPE html>
       <section id="s10">
         <h2>10. Future Improvements</h2>
         <ul class="bullets">
-          <li>Phase 4 CI: pytest + stratified eval smoke (guidebook gate 0.700 passed on 164848)</li>
-          <li>Faithfulness ≥0.90 without relevancy loss — tighter generation, not more abstention</li>
+          <li>Phase 4 CI shipped (rag-ci.yml + ci_eval_gate.py); local smoke PASS — GH runner pending billing fix</li>
+          <li>Faithfulness ≥0.90 without relevancy loss — tighter generation, not more abstention (guidebook 0.629 today)</li>
           <li>Independent Claude-as-judge; per-user ACL metadata filters; GPU latency path</li>
         </ul>
       </section>
@@ -830,7 +830,7 @@ html = f'''<!DOCTYPE html>
             <li>Guidebook faithfulness 0.629 vs 0.90 target; code-query rel 0.525 (run 164848)</li>
             <li>Policy faithfulness 0.807 vs 0.90 target on best balanced run</li>
             <li>7B local model limits; CPU e2e p50 53.5s; no production traffic metrics</li>
-            <li>LLM judge not independent from generator; Phase 4 CI not wired yet</li>
+            <li>LLM judge not independent from generator; GH Actions CI pending billing resolution</li>
           </ul>
           <h3 class="red-flag">Red flags to avoid</h3>
           <ul class="bullets">
@@ -850,7 +850,7 @@ html = f'''<!DOCTYPE html>
             <li><strong>Resolved:</strong> Git-derived timeline — ~0.5 weeks span, 13 eval runs in 5.4h (docs/project_timeline.json)</li>
             <li><strong>Resolved:</strong> Measured p50/p95 — e2e 53.5s / 58.8s on 5 golden cases (logs/latency_benchmark.json)</li>
             <li><strong>Resolved:</strong> Hybrid BM25 shipped; corpus scoping; code validation 100% pass (143246); guidebook rel gate 0.700 (164848)</li>
-            <li><strong>Remaining:</strong> Independent judge (Claude API); Phase 4 CI wiring; faithfulness recovery on guidebook</li>
+            <li><strong>Remaining:</strong> Independent judge (Claude API); GH Actions green run; faithfulness recovery on guidebook</li>
           </ul>
         </div>
       </section>

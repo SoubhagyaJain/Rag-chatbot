@@ -19,8 +19,8 @@ We built a **local, production-oriented RAG system** for company policy and lega
 | Reranker | `BAAI/bge-reranker-large` |
 | UI | **Streamlit** (primary) + Chainlit (legacy) |
 | Deploy | **Docker** (Streamlit container + host Ollama) |
-| Eval | 15-case golden set + LLM-as-judge + `logs/evaluation_results.json` |
-| Tests | **94** passing (`pytest tests/ -v`) |
+| Eval | 60-case golden set (25 policy + 35 guidebook) + LLM-as-judge + `logs/evaluation_results.json` |
+| Tests | **182** passing (`pytest tests/ -v`) |
 
 ### Headline metric improvements (balanced mode, golden set)
 
@@ -28,6 +28,13 @@ We built a **local, production-oriented RAG system** for company policy and lega
 |--------|----------------|---------------|--------|---------------|
 | **Answer Relevancy** | 0.40 | **0.747** | +0.347 | **+87%** vs regression low |
 | **Answer Relevancy** | 0.42 (strict) | **0.747** | +0.327 | **+78%** vs strict baseline |
+
+### 2026-06-18 addendum (Track A + Phase 4 CI)
+
+- Guidebook relevancy gate **passed** on full 35-case run `164848` (rel **0.700**).
+- Phase 4 CI tasks 5–6 **shipped**: `.github/workflows/rag-ci.yml` + `scripts/ci_eval_gate.py` (retrieval smoke: hit 1.00 / prec 0.896 / rec 0.75).
+- **182** pytest tests; local smoke verified; GitHub Actions runner blocked on billing until resolved.
+- Remaining quality gap: guidebook faithfulness **0.629** vs 0.90 target — see [README3.md](README3.md) §7.
 | **Context Precision** | 0.53 | **0.80** | +0.27 | **+51%** |
 | **Faithfulness** | 0.71 | **0.94** | varies by mode | See trade-off section |
 | **Hit rate** | 0.87 | **0.87** | stable | Retrieval already strong |
@@ -675,10 +682,10 @@ docker compose up
 
 ## How to reproduce & test
 
-### Full eval (15 cases, ~15 min)
+### Full eval (60 cases policy+guidebook; guidebook-only ~47 min)
 
 ```bash
-python -m pytest tests/ -v          # 94 tests
+python -m pytest tests/ -v          # 182 tests
 python scripts/evaluate.py          # golden set → logs/evaluation_results.json
 ```
 
@@ -759,7 +766,7 @@ company_policy_rag/
 ├── logs/
 │   ├── evaluation_results.json   # Metric trend log (append-only)
 │   └── app.log
-├── tests/                    # 94 tests
+├── tests/                    # 182 tests
 ├── scripts/
 │   ├── index_documents.py
 │   └── evaluate.py
@@ -780,7 +787,7 @@ company_policy_rag/
 | `test_evaluation.py` | Context-aware relevancy judge |
 | `test_chroma_telemetry.py` | NoOp telemetry, settings conflict recovery, index probe |
 
-**Total: 94 tests passing** (as of last run).
+**Total: 182 tests passing** (as of last run).
 
 ---
 

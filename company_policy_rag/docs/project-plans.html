@@ -1165,7 +1165,7 @@
         <h3 style="margin-top:2rem;">Guidebook / Track A (35-case + enumeration subset)</h3>
         <p>Dual-corpus index: 308 chunks. Eval scoped with <code>--corpus guidebook</code> and <code>source_file</code> post-filter.</p>
         <div class="target-line" style="margin-top:1rem;">
-          <strong>Guidebook gate:</strong> passed on run <code>164848</code> (rel 0.700, hit 0.771). Enumeration subset <code>160052</code> (rel 0.84). <strong>Phase 4 CI</strong> tasks 5–6 shipped (<code>rag-ci.yml</code> + <code>ci_eval_gate.py</code>).
+          <strong>Guidebook gate:</strong> passed on run <code>164848</code> (rel 0.700, hit 0.771). Enumeration subset <code>160052</code> (rel 0.84). <strong>Phase 4 CI</strong> tasks 5–6 shipped (<code>rag-ci.yml</code> + <code>ci_eval_gate.py</code>). Local smoke PASS (hit 1.00 / prec 0.896 / rec 0.75). GH Actions blocked on billing — run <code>ci_eval_gate.py</code> locally. <strong>Next:</strong> faithfulness tuning (0.629 → 0.90).
         </div>
         <p class="scroll-hint">← Swipe table to see all columns →</p>
         <div class="table-wrap">
@@ -2109,7 +2109,10 @@
               <tr><td>Code validation pass rate</td><td class="high-score">100%</td><td>Weak subset <code>143246</code></td></tr>
               <tr><td>Hybrid BM25</td><td class="high-score">Done</td><td>RRF fusion default on</td></tr>
               <tr><td>Corpus-scoped retrieval</td><td class="high-score">Done</td><td>src/retrieval_scope.py</td></tr>
-              <tr><td>Phase 4 CI (pytest + eval smoke)</td><td class="high-score">Done</td><td><code>rag-ci.yml</code>; retrieval smoke hit 1.00 / prec 0.896 / rec 0.75</td></tr>
+              <tr><td>Phase 4 CI (pytest + eval smoke)</td><td class="high-score">Done</td><td><code>rag-ci.yml</code>; local smoke hit 1.00 / prec 0.896 / rec 0.75; GH billing blocker</td></tr>
+              <tr><td>Guidebook faithfulness ≥ 0.90</td><td class="low-score">0.629</td><td><strong>Next priority</strong> — run <code>164848</code> bucket analysis</td></tr>
+              <tr><td>Semantic query cache (task 7)</td><td>Deferred</td><td>Phase 4 remainder</td></tr>
+              <tr><td>Timing dashboard (task 8)</td><td>Deferred</td><td>Phase 4 remainder</td></tr>
               <tr><td>Per-user ACL filters</td><td>Planned</td><td>Track A Phase 5</td></tr>
             </tbody>
           </table>

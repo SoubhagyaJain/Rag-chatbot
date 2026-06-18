@@ -17,7 +17,7 @@ def para(text: str) -> str:
 
 ANSWERS: dict[tuple[str, str], str] = {
     ('Walk me through this project in 60 seconds.', 'What would you do differently?'): para(
-        'I would wire an independent Claude-as-judge for faithfulness scoring in evaluation.py while keeping local qwen2.5:7b generation, and add Phase 4 CI: pytest gate plus eval smoke on a stratified golden subset. Hybrid BM25 and corpus-scoped retrieval are shipped on the 308-chunk dual-corpus index; guidebook rel gate passed at 0.700 (run 164848). Next gap is faithfulness recovery (0.629 vs 0.90) without relevancy loss.'
+        'I would wire an independent Claude-as-judge for faithfulness scoring in evaluation.py while keeping local qwen2.5:7b generation. Phase 4 CI is shipped (rag-ci.yml + ci_eval_gate.py; local smoke PASS). Hybrid BM25 and corpus-scoped retrieval are on the 308-chunk dual-corpus index; guidebook rel gate passed at 0.700 (run 164848). Next gap is faithfulness recovery (0.629 vs 0.90) without relevancy loss.'
     ),
     ('Walk me through this project in 60 seconds.', 'Biggest failure?'): para(
         'Run 091001: answer relevancy collapsed to 0.40 even though context precision held at 0.82—the faithfulness guard in generation.py was replacing substantive answers with abstention boilerplate. I traced it via guard_modified flags in evaluation.py and fixed prompts, few-shots, and guard behavior across four phases. Recovery landed at 0.747 relevancy on run 104356 without hiding the regression in logs.'
@@ -29,7 +29,7 @@ ANSWERS: dict[tuple[str, str], str] = {
         'At 60 golden cases (15 policy + 35 guidebook + subsets) I do human-style rubric design with LLM execution; the scalable piece is append-only evaluation_results.json that catches regressions like 091001 automatically. Cases are stratified by failure mode (faithfulness, relevancy, citation precision, enumeration, code validation); human spot-checks on disagreements and strict vs balanced modes in prompts.py act as oversight knobs for auditors vs employees.'
     ),
     ('What was your role and scope?', 'How long did it take?'): para(
-        'Git shows one commit on 2026-06-17 (~0.5 calendar weeks in span); intensive solo sprint with 13 policy eval runs on 2026-06-17 (best balanced 104356) plus Track A guidebook work on 2026-06-18 (60 golden cases, full guidebook gate 164848 rel 0.700). Scope: indexing through Streamlit UI, Docker, 180 pytest tests, LlamaIndex 0.14 migration. Full guidebook eval takes ~47 minutes on CPU; evaluation.py is the forcing function. Source: docs/project_timeline.json and README3.md.'
+        'Git span ~0.5 calendar weeks with intensive solo sprint: 13 policy eval runs on 2026-06-17 (best balanced 104356) plus Track A guidebook work on 2026-06-18 (60 golden cases, gate 164848 rel 0.700, Phase 4 CI commit 085d957). Scope: indexing through Streamlit UI, Docker, 182 pytest tests, LlamaIndex 0.14 migration. Full guidebook eval takes ~47 minutes on CPU; evaluation.py is the forcing function. Source: docs/project_timeline.json and README3.md.'
     ),
     ('What was your role and scope?', 'What would a team split look like?'): para(
         'I would split retrieval/indexing (retriever.py, indexing.py, query_processing.py), generation/safety (generation.py, prompts.py, citations.py), and platform/eval (evaluation.py, agent.py, Streamlit, Docker). config.py stays shared so retrieval and eval never drift. As solo builder I wore all three hats, which is why get_retrieval_config_summary() snapshots settings per eval run.'
@@ -161,7 +161,7 @@ ANSWERS: dict[tuple[str, str], str] = {
         'Employee asks sick-leave days; model answers plausibly but cites Holidays policy—employee takes wrong PTO action. Hallucinated benefits are another harm vector measured by faithfulness judge. Over-abstention in strict mode harms differently: correct topic, no answer. I default balanced for usefulness; strict for auditors.'
     ),
     ('How did you productionize this?', 'CI/CD?'): para(
-        'Docker Compose plus Streamlit plus 180 pytest tests, but no automated pipeline—tests and evaluate.py are manual today. Would add GitHub Actions: pytest on PR, optional eval smoke on stratified golden subset, image build to registry. entrypoint.sh already waits for Ollama and supports AUTO_INDEX_ON_START.'
+        'Docker Compose plus Streamlit plus 182 pytest tests. Phase 4 CI shipped (rag-ci.yml: pytest + ci_eval_gate.py); local smoke PASS; GitHub runner blocked on billing until resolved. entrypoint.sh waits for Ollama and supports AUTO_INDEX_ON_START.'
     ),
     ('How did you productionize this?', 'K8s?'): para(
         'Docker is deployment-ready for a single replica; K8s would add for multi-tenant HR scale: separate Ollama inference deployment, Chroma or managed vector DB StatefulSet, Streamlit HPA. Host Ollama pattern does not map cleanly to K8s—I would move inference in-cluster with model versioning.'
@@ -203,10 +203,10 @@ ANSWERS: dict[tuple[str, str], str] = {
         'Would pin Ollama model tags in config.py (OLLAMA_MODEL=qwen2.5:7b) and document in README; eval runs snapshot model in get_retrieval_config_summary(). Production needs explicit upgrade playbook—re-run stratified golden subset (policy factual + guidebook enumeration/code) before promoting a new weights version.'
     ),
     ("What's missing for true production?", 'First priority if hired?'): para(
-        'Phase 4 CI: pytest gate plus eval smoke on stratified golden subset so merges block on retrieval/regression. Guidebook rel gate passed at 0.700 (run 164848); lock CI thresholds against that baseline. Second: independent Claude-as-judge for faithfulness to close the 0.629 gap on guidebook.'
+        'Phase 4 CI is shipped (local smoke PASS; GH runner pending billing fix). Next priority: faithfulness recovery on guidebook (0.629 → 0.90) without relevancy loss. Second: independent Claude-as-judge for faithfulness scoring.'
     ),
     ("What's missing for true production?", '90-day roadmap?'): para(
-        'Days 1–30: Phase 4 CI (pytest + eval smoke), OTel spans, full guidebook re-eval. Days 31–60: human-judge overlap, faithfulness recovery on guidebook without relevancy loss. Days 61–90: metadata ACL filters, nightly full golden run, semantic query cache, p95 dashboard in staging.'
+        'Days 1–30 done: full guidebook re-eval (164848), Phase 4 CI shipped. Days 31–60: faithfulness recovery, human-judge overlap. Days 61–90: semantic query cache, p95 dashboard, ACL filters, nightly golden run.'
     ),
     ('Why ReAct agent vs always-on RAG?', 'When does agent skip retrieval?'): para(
         'Greetings, meta questions, and clarifications skip policy_search—the agent answers from system prompt. Substantive policy questions invoke policy_search which runs full build_query_engine() pipeline (k=30, rerank, guard). Same stack, no duplicate retrieval code in agent.py.'
@@ -257,7 +257,7 @@ ANSWERS: dict[tuple[str, str], str] = {
         'Top methodology upgrade: independent model family judging faithfulness/relevancy with retrieved context, while qwen2.5:7b stays local generator. Reduces contamination from shared weights. Anthropic-aligned validation pattern—stronger judge than policy generator.'
     ),
     ('If you had 2 more weeks?', 'What would you cut?'): para(
-        'I would cut Streamlit polish and new agent features before cutting eval or tests. Phase 4 CI smoke and full guidebook validation deliver more safety ROI than UI extras. 180 pytest tests and append-only eval logs stay non-negotiable—they caught 091001, the citation bug, and enumeration regressions.'
+        'I would cut Streamlit polish and new agent features before cutting eval or tests. Phase 4 CI smoke and full guidebook validation deliver more safety ROI than UI extras. 182 pytest tests and append-only eval logs stay non-negotiable—they caught 091001, the citation bug, and enumeration regressions.'
     ),
     ('If you had 2 more weeks?', 'Ship vs perfect?'): para(
         'Ship at 0.747 relevancy (within 0.003 of 0.75 target) with documented faith 0.807 gap—honest beats rounded claims. Perfection on faith 1.00 already proved unusable (relv 0.42 strict). Eval trend line is the ship gate, not gut feel.'
