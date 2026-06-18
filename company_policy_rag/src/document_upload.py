@@ -14,6 +14,7 @@ from src.indexing import (
     configure_llama_index,
     remove_document_from_index,
 )
+from src.pdf_images import remove_images_for_source
 
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
 _PDF_MAGIC = b"%PDF"
@@ -79,6 +80,7 @@ def remove_legal_document(filename: str) -> RemoveDocumentResult:
     source_file = path.name
     configure_llama_index()
     chunks_removed = remove_document_from_index(source_file)
+    remove_images_for_source(source_file)
     path.unlink()
     return RemoveDocumentResult(
         filename=source_file,

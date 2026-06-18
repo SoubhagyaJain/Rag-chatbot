@@ -32,6 +32,7 @@ from llama_index.readers.file import PDFReader
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
 from src.config import PROJECT_ROOT, settings
+from src.pdf_images import clear_all_pdf_images, extract_pdf_images
 from src.utils import (
     SectionHeading,
     SectionTracker,
@@ -618,6 +619,10 @@ def build_index(
         settings.chroma_persist_dir.mkdir(parents=True, exist_ok=True)
         logger.info("Cleared Chroma persist dir: %s", settings.chroma_persist_dir)
 
+    if force_rebuild and settings.enable_pdf_images:
+        clear_all_pdf_images()
+        logger.info("Cleared PDF image cache: %s", settings.pdf_images_dir)
+
     all_paths = pdf_paths or discover_pdf_files()
     if not all_paths:
         logger.warning("No PDF paths provided for indexing.")
@@ -654,6 +659,20 @@ def build_index(
     # Remove stale chunks for files being updated (hash changed or new file)
     for path in paths_to_index:
         _delete_chunks_for_source(collection, path.name)
+
+    if settings.enable_pdf_images:
+        for path in paths_to_index:
+            try:
+                extract_pdf_images(
+                    path,
+                    file_hash=_file_hash(path),
+                    source_file=path.name,
+                    force=force_rebuild,
+                )
+            except Exception as exc:
+                msg = f"PDF image extraction failed for {path.name}: {exc}"
+                logger.warning(msg)
+                result.errors.append(msg)
 
     nodes = documents_to_nodes(documents)
     result.nodes_created = len(nodes)

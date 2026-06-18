@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     legal_dir: Path = Field(default=PROJECT_ROOT / "data" / "legal")
     raw_dir: Path = Field(default=PROJECT_ROOT / "data" / "raw")
     storage_dir: Path = Field(default=PROJECT_ROOT / "storage")
+    pdf_images_dir: Path = Field(default=PROJECT_ROOT / "storage" / "images")
     logs_dir: Path = Field(default=PROJECT_ROOT / "logs")
 
     # ── ChromaDB vector store ──────────────────────────────────────────────
@@ -189,6 +190,12 @@ class Settings(BaseSettings):
     eval_max_samples: int = Field(default=0, alias="EVAL_MAX_SAMPLES")  # 0 = all cases
     eval_use_llm_judge: bool = Field(default=True, alias="EVAL_USE_LLM_JUDGE")
 
+    # ── PDF image extraction (citation visuals) ────────────────────────────
+    enable_pdf_images: bool = Field(default=True, alias="ENABLE_PDF_IMAGES")
+    pdf_image_min_px: int = Field(default=80, alias="PDF_IMAGE_MIN_PX")
+    pdf_page_thumb_dpi: int = Field(default=120, alias="PDF_PAGE_THUMB_DPI")
+    citation_max_page_images: int = Field(default=4, alias="CITATION_MAX_PAGE_IMAGES")
+
     # ── Document taxonomy ──────────────────────────────────────────────────
     # Maps top-level data subfolders → metadata document_type values
     folder_document_types: dict[str, str] = Field(
@@ -207,6 +214,7 @@ class Settings(BaseSettings):
             self.legal_dir,
             self.raw_dir,
             self.storage_dir,
+            self.pdf_images_dir,
             self.chroma_persist_dir,
             self.logs_dir,
             self.eval_dataset_path.parent,

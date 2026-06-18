@@ -463,13 +463,20 @@ def format_citation(node: TextNode | NodeWithScore) -> dict[str, Any]:
     Rich citations are critical in policy/legal RAG: users must verify claims
     against the exact source page, section path, and clause number.
     """
+    from src.pdf_images import get_page_images
+
     base = node.node if isinstance(node, NodeWithScore) else node
     meta = base.metadata or {}
     score = node.score if isinstance(node, NodeWithScore) else None
 
+    source_file = meta.get("source_file", "unknown")
+    page_number = meta.get("page_number")
+    page_images = get_page_images(source_file, page_number)
+    max_images = settings.citation_max_page_images
+
     return {
-        "source_file": meta.get("source_file", "unknown"),
-        "page_number": meta.get("page_number"),
+        "source_file": source_file,
+        "page_number": page_number,
         "section_title": meta.get("section_title"),
         "section_number": meta.get("section_number"),
         "section_path": meta.get("section_path"),
@@ -478,6 +485,7 @@ def format_citation(node: TextNode | NodeWithScore) -> dict[str, Any]:
         "file_path": meta.get("file_path"),
         "score": round(score, 4) if score is not None else None,
         "excerpt": (base.text or "")[:300],
+        "page_images": [str(path) for path in page_images[:max_images]],
     }
 
 

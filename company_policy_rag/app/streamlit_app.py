@@ -325,6 +325,14 @@ def _render_sources(citations: list[dict[str, Any]]) -> None:
                 st.markdown("**Excerpt**")
                 st.caption(format_citation_excerpt(citation, max_len=500))
 
+            page_images = citation.get("page_images") or []
+            if page_images:
+                st.markdown("**Page visuals**")
+                for img_path in page_images:
+                    path = Path(img_path)
+                    if path.is_file():
+                        st.image(str(path), caption=path.name, use_container_width=True)
+
 
 def _render_grounding_badge() -> None:
     mode = resolve_grounding_mode()

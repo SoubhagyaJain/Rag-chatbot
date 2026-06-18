@@ -74,6 +74,7 @@ def test_remove_legal_document_deletes_file(tmp_path, monkeypatch):
     monkeypatch.setattr(du, "settings", cfg.settings)
     monkeypatch.setattr(du, "configure_llama_index", lambda: None)
     monkeypatch.setattr(du, "remove_document_from_index", lambda _name: 3)
+    monkeypatch.setattr(du, "remove_images_for_source", lambda _name: None)
 
     result = remove_legal_document("contract.pdf")
 

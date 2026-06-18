@@ -201,7 +201,7 @@ Open [http://localhost:8501](http://localhost:8501).
 **Useful commands:**
 
 ```bash
-docker compose run --rm app python scripts/index_documents.py --force   # rebuild index
+docker compose run --rm app python scripts/index_documents.py --force   # rebuild index + extract PDF images for citations
 docker compose run --rm app python scripts/evaluate.py                  # golden-set eval
 docker compose down
 ```
