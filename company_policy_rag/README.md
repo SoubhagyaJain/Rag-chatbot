@@ -208,6 +208,32 @@ docker compose down
 
 Set `AUTO_INDEX_ON_START=true` in `.env.docker` to index automatically when Chroma is empty.
 
+### Install from GitHub Packages (Container registry)
+
+Pre-built image: `ghcr.io/soubhagyajain/rag-chatbot`
+
+```bash
+docker pull ghcr.io/soubhagyajain/rag-chatbot:latest
+cp .env.docker.example .env.docker
+docker compose -f docker-compose.ghcr.yml up -d
+```
+
+Images are published automatically on pushes to `main` and version tags (`v*`).
+
+### Install from PyPI
+
+Package: [`soubhagya-policy-rag`](https://pypi.org/project/soubhagya-policy-rag/)
+
+```bash
+pip install soubhagya-policy-rag
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+cp .env.example .env
+policy-rag-index
+policy-rag-chat
+```
+
+Run commands from this directory (or set `POLICY_RAG_ROOT` to its path) so `data/`, `storage/`, and `.env` resolve correctly.
+
 ### Run tests
 
 ```bash

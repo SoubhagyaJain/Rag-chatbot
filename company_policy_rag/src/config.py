@@ -24,8 +24,21 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-# Project root is one level above src/
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+def _resolve_project_root() -> Path:
+    """Resolve runtime project root for dev, pip install, and Docker layouts."""
+    env_root = os.environ.get("POLICY_RAG_ROOT")
+    if env_root:
+        return Path(env_root).expanduser().resolve()
+
+    dev_root = Path(__file__).resolve().parent.parent
+    if (dev_root / "pyproject.toml").is_file() or (dev_root / "data").is_dir():
+        return dev_root
+
+    return Path.cwd().resolve()
+
+
+# Project root: one level above src/ in dev; cwd or POLICY_RAG_ROOT when pip-installed
+PROJECT_ROOT = _resolve_project_root()
 
 
 class Settings(BaseSettings):

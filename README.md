@@ -39,12 +39,32 @@ python scripts/index_documents.py
 streamlit run app/streamlit_app.py
 ```
 
-Docker:
+Docker (build locally):
 
 ```bash
 cd company_policy_rag
 cp .env.docker.example .env.docker
 docker compose up --build
+```
+
+Docker (pull from GitHub Packages / ghcr.io):
+
+```bash
+git clone https://github.com/SoubhagyaJain/Rag-chatbot.git
+cd Rag-chatbot/company_policy_rag
+cp .env.docker.example .env.docker
+docker pull ghcr.io/soubhagyajain/rag-chatbot:latest
+docker compose -f docker-compose.ghcr.yml up -d
+```
+
+PyPI (library + CLI — run from project directory with `data/`, `.env`):
+
+```bash
+pip install soubhagya-policy-rag
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+cd company_policy_rag && cp .env.example .env
+policy-rag-index
+policy-rag-chat
 ```
 
 Open [http://localhost:8501](http://localhost:8501).
