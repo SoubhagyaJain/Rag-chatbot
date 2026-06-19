@@ -7,6 +7,8 @@ Usage:
     python scripts/ci_eval_gate.py --write-baseline   # refresh ci_smoke_baseline.json locally
 
 Exits 0 when hit_rate, context_precision, and context_recall meet CI_SMOKE_MIN_* floors.
+
+Triggered on GitHub Actions via rag-ci.yml (eval-smoke job).
 """
 
 from __future__ import annotations

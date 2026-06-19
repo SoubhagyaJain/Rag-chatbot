@@ -1,6 +1,7 @@
 name: RAG CI
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - "company_policy_rag/**"
