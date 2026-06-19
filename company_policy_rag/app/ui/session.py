@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -11,15 +9,10 @@ import streamlit as st
 from llama_index.core.agent import ReActAgent
 from llama_index.core.memory import ChatMemoryBuffer
 
-from src.agent import AgentTurnResult, chat_with_memory, configure_llm, create_agent
-from src.citations import (
-    begin_citation_turn,
-    get_generation_nodes_this_turn,
-    select_citations_for_answer,
-)
+from src.agent import AgentTurnResult, configure_llm, create_agent
+from src.chat_service import apply_grounding_mode as _apply_grounding_mode
+from src.chat_service import run_chat_turn
 from src.config import settings
-from src.language import append_language_hint
-from src.prompts import LOW_CONFIDENCE_MESSAGE, resolve_grounding_mode
 from src.indexing import (
     configure_llama_index,
     get_collection_stats,
@@ -30,22 +23,13 @@ from src.indexing import (
 from src.memory import create_session_memory
 from src.prompts import resolve_grounding_mode
 from src.retrieval_scope import corpus_retrieval_filters, resolve_query_filters
+from src.prompts import resolve_grounding_mode
 from src.retriever import build_query_engine, build_retriever
-from src.timing import begin_query_timing, clear_timing, get_current_timing, record_stage
 from src.utils import logger
 
 
 def apply_grounding_mode(mode: str) -> None:
-    if mode == "strict":
-        settings.grounding_strictness = "strict"
-        settings.response_prompt_version = "v2_strict"
-        settings.faithfulness_guard_mode = "strict"
-        settings.strict_grounding = True
-    else:
-        settings.grounding_strictness = "balanced"
-        settings.response_prompt_version = "v2_balanced"
-        settings.faithfulness_guard_mode = "balanced"
-        settings.strict_grounding = False
+    _apply_grounding_mode("strict" if mode == "strict" else "balanced")
 
 
 def corpus_scope_filters(scope: str | None) -> dict[str, str] | None:
@@ -146,42 +130,20 @@ def ensure_query_engine(user_message: str | None = None) -> Any:
 
 def run_direct_turn(user_message: str) -> AgentTurnResult:
     """Single-shot RAG without ReAct agent overhead."""
-    query_engine = ensure_query_engine(user_message)
-    begin_query_timing()
-    t0 = time.perf_counter()
-    try:
-        begin_citation_turn()
-        response = query_engine.query(append_language_hint(user_message))
-        answer = _extract_query_answer(response)
-
-        citations: list[dict[str, Any]] = []
-        if settings.show_citations:
-            generation_nodes = get_generation_nodes_this_turn()
-            citations = select_citations_for_answer(
-                answer,
-                generation_nodes,
-                user_query=user_message,
-            )
-
-        record_stage("e2e", (time.perf_counter() - t0) * 1000)
-        timing = get_current_timing()
-        timing_dict = timing.as_dict() if timing else None
-        if timing_dict:
-            samples: list[float] = st.session_state.get("timing_samples", [])
-            e2e = timing_dict.get("e2e_ms", 0)
-            if e2e:
-                samples.append(float(e2e))
-                st.session_state.timing_samples = samples[-50:]
-
-        return AgentTurnResult(
-            answer=answer,
-            citations=citations,
-            timing=timing_dict,
-            low_confidence=LOW_CONFIDENCE_MESSAGE in answer,
-            grounding_mode=resolve_grounding_mode(),
-        )
-    finally:
-        clear_timing()
+    scope = st.session_state.get("corpus_scope", "all")
+    turn = run_chat_turn(
+        user_message,
+        corpus_scope=scope,
+        chat_mode="direct",
+        grounding_mode=resolve_grounding_mode(),
+    )
+    if turn.timing:
+        samples: list[float] = st.session_state.get("timing_samples", [])
+        e2e = turn.timing.get("e2e_ms", 0)
+        if e2e:
+            samples.append(float(e2e))
+            st.session_state.timing_samples = samples[-50:]
+    return turn
 
 
 def run_agent_turn(
@@ -189,36 +151,21 @@ def run_agent_turn(
     user_message: str,
     memory: ChatMemoryBuffer | None,
 ) -> AgentTurnResult:
+    del agent, memory  # backend managed by chat_service
     scope = st.session_state.get("corpus_scope", "all")
-    if scope == "all" and resolve_query_filters(user_message, scope):
-        return run_direct_turn(user_message)
-
-    begin_query_timing()
-    t0 = time.perf_counter()
-    try:
-        try:
-            turn = asyncio.run(chat_with_memory(agent, user_message, memory=memory))
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            try:
-                turn = loop.run_until_complete(
-                    chat_with_memory(agent, user_message, memory=memory)
-                )
-            finally:
-                loop.close()
-        record_stage("e2e", (time.perf_counter() - t0) * 1000)
-        timing = get_current_timing()
-        if timing and turn.timing is None:
-            turn.timing = timing.as_dict()
-        if turn.timing:
-            samples: list[float] = st.session_state.get("timing_samples", [])
-            e2e = turn.timing.get("e2e_ms", 0)
-            if e2e:
-                samples.append(float(e2e))
-                st.session_state.timing_samples = samples[-50:]
-        return turn
-    finally:
-        clear_timing()
+    turn = run_chat_turn(
+        user_message,
+        corpus_scope=scope,
+        chat_mode="agent",
+        grounding_mode=resolve_grounding_mode(),
+    )
+    if turn.timing:
+        samples: list[float] = st.session_state.get("timing_samples", [])
+        e2e = turn.timing.get("e2e_ms", 0)
+        if e2e:
+            samples.append(float(e2e))
+            st.session_state.timing_samples = samples[-50:]
+    return turn
 
 
 def index_health() -> dict[str, Any]:

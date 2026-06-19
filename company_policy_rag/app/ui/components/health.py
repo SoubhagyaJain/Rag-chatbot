@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
-from urllib.error import URLError
-from urllib.request import urlopen
+
+from src.ollama_client import probe_ollama_tags as _probe_ollama_tags
 
 
 def load_last_eval_run(results_path: Path) -> dict[str, Any] | None:
@@ -46,21 +46,5 @@ def format_eval_metrics(run: dict[str, Any] | None) -> dict[str, str]:
 
 
 def probe_ollama_tags(base_url: str, *, timeout: float = 5.0) -> tuple[bool, list[str], str | None]:
-    """
-    Call Ollama GET /api/tags. Returns (ok, model_names, error_message).
-    """
-    url = base_url.rstrip("/") + "/api/tags"
-    try:
-        with urlopen(url, timeout=timeout) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except URLError as exc:
-        return False, [], str(exc.reason if hasattr(exc, "reason") else exc)
-    except (TimeoutError, json.JSONDecodeError, OSError) as exc:
-        return False, [], str(exc)
-
-    models = payload.get("models") or []
-    names: list[str] = []
-    for item in models:
-        if isinstance(item, dict) and item.get("name"):
-            names.append(str(item["name"]))
-    return True, sorted(names), None
+    """Call Ollama GET /api/tags. Returns (ok, model_names, error_message)."""
+    return _probe_ollama_tags(base_url, timeout=timeout)
