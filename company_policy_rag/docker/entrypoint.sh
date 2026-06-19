@@ -39,6 +39,8 @@ PY
   fi
 fi
 
+export PYTHONPATH="/app${PYTHONPATH:+:$PYTHONPATH}"
+
 exec streamlit run app/streamlit_app.py \
   --server.address=0.0.0.0 \
   --server.port="${STREAMLIT_PORT}" \
