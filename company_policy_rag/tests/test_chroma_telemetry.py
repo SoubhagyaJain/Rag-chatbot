@@ -54,7 +54,18 @@ def test_index_exists_recovers_from_settings_conflict() -> None:
 
     import chromadb
 
+    # Simulate another library opening the persist dir with default settings.
     chromadb.PersistentClient(path=path, settings=chromadb.Settings())
+
+    # Our client should recover from the settings conflict.
+    client = get_chroma_client()
+    collection = get_chroma_collection(client)
+    if collection.count() == 0:
+        collection.add(
+            ids=["telemetry-conflict-probe"],
+            documents=["settings conflict recovery probe"],
+            metadatas=[{"source": "test_chroma_telemetry"}],
+        )
 
     assert index_exists() is True
 
