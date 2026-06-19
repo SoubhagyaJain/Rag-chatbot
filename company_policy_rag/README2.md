@@ -35,6 +35,14 @@ We built a **local, production-oriented RAG system** for company policy and lega
 - Phase 4 CI tasks 5–6 **shipped**: `.github/workflows/rag-ci.yml` + `scripts/ci_eval_gate.py` (retrieval smoke: hit 1.00 / prec 0.896 / rec 0.75).
 - **182** pytest tests; local smoke verified; GitHub Actions runner blocked on billing until resolved.
 - Remaining quality gap: guidebook faithfulness **0.629** vs 0.90 target — see [README3.md](README3.md) §7.
+
+### 2026-06-19 addendum (CI green + faithfulness tuning)
+
+- **GitHub Actions green** on run [#27804469869](https://github.com/SoubhagyaJain/Rag-chatbot/actions/runs/27804469869) — billing resolved; `unit-tests` 182/182 + `eval-smoke` PASS.
+- **Faithfulness tuning** shipped in `dd40b86`: prompt rules 19b–25, few-shots P–X, optional claim-trim guard (`FAITHFULNESS_GUARD_REJECT_ACTION`, default `keep`).
+- Full 35-case guidebook re-eval `055058`: faith **0.543**, rel **0.666** — **regression** vs baseline `164848` (faith **0.629**, rel **0.700**). Per-case: 2 improved / 8 regressed / 25 unchanged. Clear win: `manager_agent` faith **1.0**.
+- **Lesson:** prompt-only tuning with qwen2.5:7b did not move aggregate faith; claim-trim default `keep` after weak-subset test showed faith drop with `trim`. Root cause for code cases is **retrieval** (`currency_tool_example`, `tools_real_world`), not generation prompts alone.
+- **Next:** code/currency retrieval boost — see [README3.md](README3.md) §7 task 19.
 | **Context Precision** | 0.53 | **0.80** | +0.27 | **+51%** |
 | **Faithfulness** | 0.71 | **0.94** | varies by mode | See trade-off section |
 | **Hit rate** | 0.87 | **0.87** | stable | Retrieval already strong |

@@ -17,7 +17,7 @@ def para(text: str) -> str:
 
 ANSWERS: dict[tuple[str, str], str] = {
     ('Walk me through this project in 60 seconds.', 'What would you do differently?'): para(
-        'I would wire an independent Claude-as-judge for faithfulness scoring in evaluation.py while keeping local qwen2.5:7b generation. Phase 4 CI is shipped (rag-ci.yml + ci_eval_gate.py; local smoke PASS). Hybrid BM25 and corpus-scoped retrieval are on the 308-chunk dual-corpus index; guidebook rel gate passed at 0.700 (run 164848). Next gap is faithfulness recovery (0.629 vs 0.90) without relevancy loss.'
+        'I would wire an independent Claude-as-judge for faithfulness scoring in evaluation.py while keeping local qwen2.5:7b generation. Phase 4 CI is green on GitHub (run 27804469869). Hybrid BM25 and corpus-scoped retrieval are on the 308-chunk dual-corpus index; guidebook rel gate passed at 0.700 (run 164848). Faithfulness prompt tuning dd40b86 (run 055058) did not improve aggregate faith (0.543 vs baseline 0.629). Next: code/currency retrieval fixes.'
     ),
     ('Walk me through this project in 60 seconds.', 'Biggest failure?'): para(
         'Run 091001: answer relevancy collapsed to 0.40 even though context precision held at 0.82—the faithfulness guard in generation.py was replacing substantive answers with abstention boilerplate. I traced it via guard_modified flags in evaluation.py and fixed prompts, few-shots, and guard behavior across four phases. Recovery landed at 0.747 relevancy on run 104356 without hiding the regression in logs.'
@@ -41,7 +41,7 @@ ANSWERS: dict[tuple[str, str], str] = {
         'Every eval run logs config snapshots, guard_modified flags, and pre_guard_answer traces. I added pytest coverage for guard behavior, citation selection, and normalize_balanced_answer. Before declaring victory I now check faithfulness and relevancy together—strict mode taught me that faith 1.00 with relevancy 0.42 is a silent failure.'
     ),
     ('What would you put on a Claude system card for this?', 'Residual risk?'): para(
-        'Residual risks: policy faithfulness 0.807 on run 104356 still below 0.90; guidebook faithfulness 0.629 on run 164848 (rel gate passed at 0.700); code-query rel 0.525 on full guidebook run; qwen2.5:7b can paraphrase unsupported details; 308 chunks does not prove 10k-PDF generalization. Score-based citation fallback in citations.py can surface chunks not tagged in the answer if the model omits [Source N] tags. Policy staleness is not detected automatically.'
+        'Residual risks: policy faithfulness 0.807 on run 104356 still below 0.90; guidebook faithfulness 0.629 baseline on run 164848 (prompt tuning 055058: 0.543); code bucket faith 0.25 on 055058; qwen2.5:7b can paraphrase unsupported details; 308 chunks does not prove 10k-PDF generalization. Score-based citation fallback in citations.py can surface chunks not tagged in the answer if the model omits [Source N] tags. Policy staleness is not detected automatically.'
     ),
     ('What would you put on a Claude system card for this?', 'Human escalation path?'): para(
         'When balanced mode cannot ground an answer or guard rejects with high confidence, the UI should route to HR—not fabricate policy. Strict mode (faith 1.00, relevancy 0.42) is the audit setting where abstention is preferred. I document both modes in prompts.py via resolve_grounding_mode; sidebar toggle lets users pick. Production gap: no formal ticketing integration yet.'
@@ -161,7 +161,7 @@ ANSWERS: dict[tuple[str, str], str] = {
         'Employee asks sick-leave days; model answers plausibly but cites Holidays policy—employee takes wrong PTO action. Hallucinated benefits are another harm vector measured by faithfulness judge. Over-abstention in strict mode harms differently: correct topic, no answer. I default balanced for usefulness; strict for auditors.'
     ),
     ('How did you productionize this?', 'CI/CD?'): para(
-        'Docker Compose plus Streamlit plus 182 pytest tests. Phase 4 CI shipped (rag-ci.yml: pytest + ci_eval_gate.py); local smoke PASS; GitHub runner blocked on billing until resolved. entrypoint.sh waits for Ollama and supports AUTO_INDEX_ON_START.'
+        'Docker Compose plus Streamlit plus 182 pytest tests. Phase 4 CI green on GitHub (run 27804469869: pytest + ci_eval_gate.py retrieval smoke). entrypoint.sh waits for Ollama and supports AUTO_INDEX_ON_START.'
     ),
     ('How did you productionize this?', 'K8s?'): para(
         'Docker is deployment-ready for a single replica; K8s would add for multi-tenant HR scale: separate Ollama inference deployment, Chroma or managed vector DB StatefulSet, Streamlit HPA. Host Ollama pattern does not map cleanly to K8s—I would move inference in-cluster with model versioning.'
@@ -203,10 +203,10 @@ ANSWERS: dict[tuple[str, str], str] = {
         'Would pin Ollama model tags in config.py (OLLAMA_MODEL=qwen2.5:7b) and document in README; eval runs snapshot model in get_retrieval_config_summary(). Production needs explicit upgrade playbook—re-run stratified golden subset (policy factual + guidebook enumeration/code) before promoting a new weights version.'
     ),
     ("What's missing for true production?", 'First priority if hired?'): para(
-        'Phase 4 CI is shipped (local smoke PASS; GH runner pending billing fix). Next priority: faithfulness recovery on guidebook (0.629 → 0.90) without relevancy loss. Second: independent Claude-as-judge for faithfulness scoring.'
+        'Phase 4 CI is green on GitHub (run 27804469869). Faithfulness prompt tuning dd40b86 attempted (run 055058: faith 0.543). Next priority: code/currency retrieval fixes, then faith recovery toward 0.90 without relevancy loss. Second: independent Claude-as-judge for faithfulness scoring.'
     ),
     ("What's missing for true production?", '90-day roadmap?'): para(
-        'Days 1–30 done: full guidebook re-eval (164848), Phase 4 CI shipped. Days 31–60: faithfulness recovery, human-judge overlap. Days 61–90: semantic query cache, p95 dashboard, ACL filters, nightly golden run.'
+        'Days 1–30 done: guidebook gate 164848, Phase 4 CI green on GH, faithfulness tuning dd40b86 (055058). Days 31–60: code/currency retrieval + faith recovery, human-judge overlap. Days 61–90: semantic query cache, p95 dashboard, ACL filters, nightly golden run.'
     ),
     ('Why ReAct agent vs always-on RAG?', 'When does agent skip retrieval?'): para(
         'Greetings, meta questions, and clarifications skip policy_search—the agent answers from system prompt. Substantive policy questions invoke policy_search which runs full build_query_engine() pipeline (k=30, rerank, guard). Same stack, no duplicate retrieval code in agent.py.'

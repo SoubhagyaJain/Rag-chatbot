@@ -1031,7 +1031,7 @@
         <span class="anthropic-badge">Anthropic Target · Solo AI/ML Engineer</span>
         <h1>Company Policy RAG<br>Topper-Level Interview Notes</h1>
         <p class="subtitle">Production grounded Q&amp;A for HR/legal PDFs — eval-driven, citation-trustworthy, alignment-aware.</p>
-        <div class="pitch-box" id="pitch-text">Employees need policy answers they can trust and verify — not confident hallucinations. As a solo AI/ML engineer, I built an evaluation-first RAG system across two corpora (308 chunks): hybrid BM25+dense retrieval, rerank, grounded generation, faithfulness guard, code validation, and citation-filtered UI. On the 15-case policy benchmark I recovered relevancy from 0.40 to 0.747 (+87%) while raising context precision to 0.80. On the guidebook track I fixed cross-corpus bleed, passed the full 35-case relevancy gate at 0.700 (run 164848), and raised enumeration relevancy to 0.84. The key insight for alignment work: maximizing faithfulness alone collapsed relevancy to 0.42; I measured that Pareto frontier explicitly instead of optimizing one headline metric.<em>Speak naturally in ~60 seconds. Do not say "solved hallucinations" — say reduced unsupported claims on golden set.</em></div>
+        <div class="pitch-box" id="pitch-text">Employees need policy answers they can trust and verify — not confident hallucinations. As a solo AI/ML engineer, I built an evaluation-first RAG system across two corpora (308 chunks): hybrid BM25+dense retrieval, rerank, grounded generation, faithfulness guard, code validation, and citation-filtered UI. On the policy benchmark I recovered relevancy from 0.40 to 0.747 (+87%). On the guidebook track I passed the 35-case relevancy gate at 0.700 (run 164848) and shipped Phase 4 CI green on GitHub. Faithfulness prompt tuning (dd40b86) taught me prompt-only fixes are insufficient when retrieval misses code chunks — I measured that honestly (run 055058: faith 0.543) instead of hiding regressions.<em>Speak naturally in ~60 seconds. Do not say "solved hallucinations" — say reduced unsupported claims on golden set.</em></div>
         <div class="btn-row">
           <button class="btn" id="copy-pitch" type="button">Copy 60s Pitch</button>
         </div>
@@ -1111,7 +1111,7 @@
         </article>
         <article class="card">
           <h3>Generation — <code>src/generation.py</code></h3>
-          <p><code>GroundedCompactAndRefine</code> → <code>normalize_balanced_answer()</code> → <code>apply_faithfulness_guard()</code> → <code>code_validation.py</code>. Balanced reject keeps answer.</p>
+          <p><code>GroundedCompactAndRefine</code> → <code>normalize_balanced_answer()</code> → <code>apply_faithfulness_guard()</code> (<code>FAITHFULNESS_GUARD_REJECT_ACTION</code>: keep/trim/abstain) → <code>code_validation.py</code>. Default keep preserves relevancy.</p>
         </article>
         <article class="card">
           <h3>Prompts — <code>src/prompts.py</code></h3>
@@ -1167,7 +1167,7 @@
             <li><strong>Reliability:</strong> fail-open rewrite, reranker graceful degradation, probe_chroma_index(), citation score fallback capped</li>
             <li><strong>Observability:</strong> app.log, citation pipeline stages, eval JSON append-only</li>
             <li><strong>Tests:</strong> 182 pytest across generation, citations, prompts, eval, chroma, code validation, retrieval scope</li>
-            <li><strong>Gaps (say honestly):</strong> GH Actions blocked on billing (local ci_eval_gate.py PASS); no drift monitoring; no live-traffic p50/p95 (golden-set benchmark: 53.5s e2e p50), CPU-only default</li>
+            <li><strong>Gaps (say honestly):</strong> guidebook faith 0.629 baseline (055058 tuning: 0.543); code/currency retrieval misses; no drift monitoring; golden-set e2e p50 53.5s, CPU-only default</li>
           </ul>
         </div>
       </section>
@@ -1211,6 +1211,7 @@
           <tr><td>152255</td><td>Guidebook post-tuning (35 cases)</td><td>0.657</td><td>0.564</td><td>0.629</td></tr>
           <tr><td>160052</td><td>Enumeration subset (5 cases)</td><td class="high-score">1.00</td><td>—</td><td class="high-score">0.84</td></tr>
           <tr class="highlight-row"><td>164848</td><td>Full guidebook post-enumeration</td><td>0.771</td><td>0.629</td><td class="high-score">0.700</td></tr>
+          <tr><td>055058</td><td>Faithfulness prompt tuning (dd40b86)</td><td>0.800</td><td>0.543</td><td>0.666</td></tr>
         </table></div>
         <p>Policy per-case: sick_leave relevancy 0.0→0.90. Guidebook: 0.629→0.700 on full 35-case run; enumeration bucket rel 0.84.</p>
       </section>
@@ -1218,7 +1219,7 @@
       <section id="s10">
         <h2>10. Future Improvements</h2>
         <ul class="bullets">
-          <li>Phase 4 CI shipped (rag-ci.yml + ci_eval_gate.py); local smoke PASS — GH runner pending billing fix</li>
+          <li>Phase 4 CI green on GitHub (run 27804469869); faithfulness tuning dd40b86 (055058)</li>
           <li>Faithfulness ≥0.90 without relevancy loss — tighter generation, not more abstention (guidebook 0.629 today)</li>
           <li>Independent Claude-as-judge; per-user ACL metadata filters; GPU latency path</li>
         </ul>
@@ -1282,7 +1283,7 @@
   <div class="q-body">
     <p class="q-why"><strong>Why they ask:</strong> Tests safety documentation thinking.</p>
     <p><strong>Answer outline:</strong></p>
-    <ul class="q-answer"><li>Intended use: internal HR policy + AI guidebook Q&amp;A on indexed PDFs.</li><li>Failure modes: unsupported claims, over-abstention, wrong citation sources, vocabulary mismatch, incomplete enumeration lists, code hallucination.</li><li>Mitigations: faithfulness guard, mandatory [Source N], balanced vs strict modes, hybrid BM25, corpus scoping, code validation pipeline, eval harness.</li><li>Known limits: 7B local model; guidebook faithfulness 0.629 vs 0.90 target; code-query rel 0.525 on full guidebook run; policy faithfulness 0.807 vs 0.90; CPU e2e p50 53.5s.</li></ul>
+    <ul class="q-answer"><li>Intended use: internal HR policy + AI guidebook Q&amp;A on indexed PDFs.</li><li>Failure modes: unsupported claims, over-abstention, wrong citation sources, vocabulary mismatch, incomplete enumeration lists, code hallucination.</li><li>Mitigations: faithfulness guard, mandatory [Source N], balanced vs strict modes, hybrid BM25, corpus scoping, code validation pipeline, eval harness.</li><li>Known limits: 7B local model; guidebook faith 0.629 baseline (055058 tuning: 0.543); code bucket faith 0.25 on 055058; policy faith 0.807; CPU e2e p50 53.5s.</li></ul>
     <p class="q-refs"><strong>Reference:</strong> <code>prompts.py, generation.py, README.md limitations</code></p>
     <p><strong>Follow-ups:</strong> <span class="fu-hint">(click → scroll to mature answer)</span></p>
     <ul class="q-follow"><li><a class="fu-link" href="#fu-05-1">Residual risk?</a></li><li><a class="fu-link" href="#fu-05-2">Human escalation path?</a></li></ul>
@@ -1620,7 +1621,7 @@
   <div class="q-body">
     <p class="q-why"><strong>Why they ask:</strong> Calibration — Anthropic values honesty.</p>
     <p><strong>Answer outline:</strong></p>
-    <ul class="q-answer"><li>Phase 4 CI shipped: rag-ci.yml (pytest + ci_eval_gate.py retrieval smoke); local smoke PASS; GH runner blocked on billing.</li><li>No production drift monitoring; no ACL per user.</li><li>Benchmarked p50/p95 on golden set (53.5s/58.8s e2e) — no live-traffic metrics yet; CPU-only default.</li><li>Hybrid BM25 shipped; guidebook rel gate passed; faithfulness 0.629 still below 0.90 target.</li></ul>
+    <ul class="q-answer"><li>Phase 4 CI green on GitHub (run 27804469869): pytest + ci_eval_gate.py retrieval smoke.</li><li>No production drift monitoring; no ACL per user.</li><li>Benchmarked p50/p95 on golden set (53.5s/58.8s e2e) — no live-traffic metrics yet; CPU-only default.</li><li>Faithfulness tuning dd40b86 (055058): faith 0.543 vs baseline 0.629; next: code/currency retrieval.</li></ul>
     <p class="q-refs"><strong>Reference:</strong> <code>README2 open items</code></p>
     <p><strong>Follow-ups:</strong> <span class="fu-hint">(click → scroll to mature answer)</span></p>
     <ul class="q-follow"><li><a class="fu-link" href="#fu-35-1">First priority if hired?</a></li><li><a class="fu-link" href="#fu-35-2">90-day roadmap?</a></li></ul>
@@ -1723,7 +1724,7 @@
   <div class="q-body">
     <p class="q-why"><strong>Why they ask:</strong> Prioritization.</p>
     <p><strong>Answer outline:</strong></p>
-    <ul class="q-answer"><li>Phase 4 CI done — next: faithfulness recovery on guidebook (0.629 → 0.90) without relevancy loss.</li><li>Independent Claude-as-judge for faithfulness scoring.</li><li>Semantic query cache + timing dashboard (Phase 4 tasks 7–8, deferred).</li><li>Live-traffic p95 dashboard (golden-set benchmark done: 58.8s e2e p95).</li></ul>
+    <ul class="q-answer"><li>Phase 4 CI green on GH. Faith tuning dd40b86 attempted (055058: faith 0.543). Next: code/currency retrieval, then faith ≥ 0.90 without relevancy loss.</li><li>Independent Claude-as-judge for faithfulness scoring.</li><li>Semantic query cache + timing dashboard (Phase 4 tasks 7–8, deferred).</li><li>Live-traffic p95 dashboard (golden-set benchmark done: 58.8s e2e p95).</li></ul>
     <p class="q-refs"><strong>Reference:</strong> <code>README2 roadmap</code></p>
     <p><strong>Follow-ups:</strong> <span class="fu-hint">(click → scroll to mature answer)</span></p>
     <ul class="q-follow"><li><a class="fu-link" href="#fu-44-1">What would you cut?</a></li><li><a class="fu-link" href="#fu-44-2">Ship vs perfect?</a></li></ul>
@@ -1822,7 +1823,7 @@
             <li>Guidebook faithfulness 0.629 vs 0.90 target; code-query rel 0.525 (run 164848)</li>
             <li>Policy faithfulness 0.807 vs 0.90 target on best balanced run</li>
             <li>7B local model limits; CPU e2e p50 53.5s; no production traffic metrics</li>
-            <li>LLM judge not independent from generator; GH Actions CI pending billing resolution</li>
+            <li>LLM judge not independent from generator; guidebook faith 0.629 baseline (055058: 0.543)</li>
           </ul>
           <h3 class="red-flag">Red flags to avoid</h3>
           <ul class="bullets">
@@ -1842,7 +1843,7 @@
             <li><strong>Resolved:</strong> Git-derived timeline — ~0.5 weeks span, 13 eval runs in 5.4h (docs/project_timeline.json)</li>
             <li><strong>Resolved:</strong> Measured p50/p95 — e2e 53.5s / 58.8s on 5 golden cases (logs/latency_benchmark.json)</li>
             <li><strong>Resolved:</strong> Hybrid BM25 shipped; corpus scoping; code validation 100% pass (143246); guidebook rel gate 0.700 (164848)</li>
-            <li><strong>Remaining:</strong> Independent judge (Claude API); GH Actions green run; faithfulness recovery on guidebook</li>
+            <li><strong>Remaining:</strong> Independent judge (Claude API); code/currency retrieval fixes; faithfulness recovery on guidebook</li>
           </ul>
         </div>
       </section>
@@ -1855,7 +1856,7 @@
           <button class="btn" id="collapse-fu-groups" type="button">Collapse Groups</button>
         </div>
         <article class="fu-group" id="fu-group-01"><h3 class="fu-parent"><span class="fu-parent-num">Q01</span> Walk me through this project in 60 seconds.</h3><p class="fu-parent-cat">Opening & Behavioral · <a href="#q-01">↑ parent question</a></p>
-<div class="fu-answer-block" id="fu-01-1"><h4 class="fu-q">What would you do differently?</h4><div class="fu-answer"><p>I would wire an independent Claude-as-judge for faithfulness scoring in evaluation.py while keeping local qwen2.5:7b generation. Phase 4 CI is shipped (rag-ci.yml + ci_eval_gate.py; local smoke PASS). Hybrid BM25 and corpus-scoped retrieval are on the 308-chunk dual-corpus index; guidebook rel gate passed at 0.700 (run 164848). Next gap is faithfulness recovery (0.629 vs 0.90) without relevancy loss.</p></div><a class="fu-back" href="#q-01">↑ Back to Q01</a></div>
+<div class="fu-answer-block" id="fu-01-1"><h4 class="fu-q">What would you do differently?</h4><div class="fu-answer"><p>I would wire an independent Claude-as-judge for faithfulness scoring in evaluation.py while keeping local qwen2.5:7b generation. Phase 4 CI is green on GitHub (run 27804469869). Hybrid BM25 and corpus-scoped retrieval are on the 308-chunk dual-corpus index; guidebook rel gate passed at 0.700 (run 164848). Faithfulness prompt tuning dd40b86 (run 055058) did not improve aggregate faith (0.543 vs baseline 0.629). Next: code/currency retrieval fixes.</p></div><a class="fu-back" href="#q-01">↑ Back to Q01</a></div>
 <div class="fu-answer-block" id="fu-01-2"><h4 class="fu-q">Biggest failure?</h4><div class="fu-answer"><p>Run 091001: answer relevancy collapsed to 0.40 even though context precision held at 0.82—the faithfulness guard in generation.py was replacing substantive answers with abstention boilerplate. I traced it via guard_modified flags in evaluation.py and fixed prompts, few-shots, and guard behavior across four phases. Recovery landed at 0.747 relevancy on run 104356 without hiding the regression in logs.</p></div><a class="fu-back" href="#q-01">↑ Back to Q01</a></div>
 </article>
 <article class="fu-group" id="fu-group-02"><h3 class="fu-parent"><span class="fu-parent-num">Q02</span> Why is this relevant to Anthropic&#x27;s work?</h3><p class="fu-parent-cat">Opening & Behavioral · <a href="#q-02">↑ parent question</a></p>
@@ -1871,7 +1872,7 @@
 <div class="fu-answer-block" id="fu-04-2"><h4 class="fu-q">What guardrails prevent recurrence?</h4><div class="fu-answer"><p>Every eval run logs config snapshots, guard_modified flags, and pre_guard_answer traces. I added pytest coverage for guard behavior, citation selection, and normalize_balanced_answer. Before declaring victory I now check faithfulness and relevancy together—strict mode taught me that faith 1.00 with relevancy 0.42 is a silent failure.</p></div><a class="fu-back" href="#q-04">↑ Back to Q04</a></div>
 </article>
 <article class="fu-group" id="fu-group-05"><h3 class="fu-parent"><span class="fu-parent-num">Q05</span> What would you put on a Claude system card for this?</h3><p class="fu-parent-cat">Opening & Behavioral · <a href="#q-05">↑ parent question</a></p>
-<div class="fu-answer-block" id="fu-05-1"><h4 class="fu-q">Residual risk?</h4><div class="fu-answer"><p>Residual risks: policy faithfulness 0.807 on run 104356 still below 0.90; guidebook faithfulness 0.629 on run 164848 (rel gate passed at 0.700); code-query rel 0.525 on full guidebook run; qwen2.5:7b can paraphrase unsupported details; 308 chunks does not prove 10k-PDF generalization. Score-based citation fallback in citations.py can surface chunks not tagged in the answer if the model omits [Source N] tags. Policy staleness is not detected automatically.</p></div><a class="fu-back" href="#q-05">↑ Back to Q05</a></div>
+<div class="fu-answer-block" id="fu-05-1"><h4 class="fu-q">Residual risk?</h4><div class="fu-answer"><p>Residual risks: policy faithfulness 0.807 on run 104356 still below 0.90; guidebook faithfulness 0.629 baseline on run 164848 (prompt tuning 055058: 0.543); code bucket faith 0.25 on 055058; qwen2.5:7b can paraphrase unsupported details; 308 chunks does not prove 10k-PDF generalization. Score-based citation fallback in citations.py can surface chunks not tagged in the answer if the model omits [Source N] tags. Policy staleness is not detected automatically.</p></div><a class="fu-back" href="#q-05">↑ Back to Q05</a></div>
 <div class="fu-answer-block" id="fu-05-2"><h4 class="fu-q">Human escalation path?</h4><div class="fu-answer"><p>When balanced mode cannot ground an answer or guard rejects with high confidence, the UI should route to HR—not fabricate policy. Strict mode (faith 1.00, relevancy 0.42) is the audit setting where abstention is preferred. I document both modes in prompts.py via resolve_grounding_mode; sidebar toggle lets users pick. Production gap: no formal ticketing integration yet.</p></div><a class="fu-back" href="#q-05">↑ Back to Q05</a></div>
 </article>
 <article class="fu-group" id="fu-group-06"><h3 class="fu-parent"><span class="fu-parent-num">Q06</span> Why over-retrieve then rerank instead of top-k=6 directly?</h3><p class="fu-parent-cat">Data & Retrieval · <a href="#q-06">↑ parent question</a></p>
@@ -1963,7 +1964,7 @@
 <div class="fu-answer-block" id="fu-27-2"><h4 class="fu-q">User harm scenario?</h4><div class="fu-answer"><p>Employee asks sick-leave days; model answers plausibly but cites Holidays policy—employee takes wrong PTO action. Hallucinated benefits are another harm vector measured by faithfulness judge. Over-abstention in strict mode harms differently: correct topic, no answer. I default balanced for usefulness; strict for auditors.</p></div><a class="fu-back" href="#q-27">↑ Back to Q27</a></div>
 </article>
 <article class="fu-group" id="fu-group-28"><h3 class="fu-parent"><span class="fu-parent-num">Q28</span> How did you productionize this?</h3><p class="fu-parent-cat">Production & MLOps · <a href="#q-28">↑ parent question</a></p>
-<div class="fu-answer-block" id="fu-28-1"><h4 class="fu-q">CI/CD?</h4><div class="fu-answer"><p>Docker Compose plus Streamlit plus 182 pytest tests. Phase 4 CI shipped (rag-ci.yml: pytest + ci_eval_gate.py); local smoke PASS; GitHub runner blocked on billing until resolved. entrypoint.sh waits for Ollama and supports AUTO_INDEX_ON_START.</p></div><a class="fu-back" href="#q-28">↑ Back to Q28</a></div>
+<div class="fu-answer-block" id="fu-28-1"><h4 class="fu-q">CI/CD?</h4><div class="fu-answer"><p>Docker Compose plus Streamlit plus 182 pytest tests. Phase 4 CI green on GitHub (run 27804469869: pytest + ci_eval_gate.py retrieval smoke). entrypoint.sh waits for Ollama and supports AUTO_INDEX_ON_START.</p></div><a class="fu-back" href="#q-28">↑ Back to Q28</a></div>
 <div class="fu-answer-block" id="fu-28-2"><h4 class="fu-q">K8s?</h4><div class="fu-answer"><p>Docker is deployment-ready for a single replica; K8s would add for multi-tenant HR scale: separate Ollama inference deployment, Chroma or managed vector DB StatefulSet, Streamlit HPA. Host Ollama pattern does not map cleanly to K8s—I would move inference in-cluster with model versioning.</p></div><a class="fu-back" href="#q-28">↑ Back to Q28</a></div>
 </article>
 <article class="fu-group" id="fu-group-29"><h3 class="fu-parent"><span class="fu-parent-num">Q29</span> Tell me about the citation trust bug.</h3><p class="fu-parent-cat">Production & MLOps · <a href="#q-29">↑ parent question</a></p>
@@ -1991,8 +1992,8 @@
 <div class="fu-answer-block" id="fu-34-2"><h4 class="fu-q">Model versioning?</h4><div class="fu-answer"><p>Would pin Ollama model tags in config.py (OLLAMA_MODEL=qwen2.5:7b) and document in README; eval runs snapshot model in get_retrieval_config_summary(). Production needs explicit upgrade playbook—re-run stratified golden subset (policy factual + guidebook enumeration/code) before promoting a new weights version.</p></div><a class="fu-back" href="#q-34">↑ Back to Q34</a></div>
 </article>
 <article class="fu-group" id="fu-group-35"><h3 class="fu-parent"><span class="fu-parent-num">Q35</span> What&#x27;s missing for true production?</h3><p class="fu-parent-cat">Production & MLOps · <a href="#q-35">↑ parent question</a></p>
-<div class="fu-answer-block" id="fu-35-1"><h4 class="fu-q">First priority if hired?</h4><div class="fu-answer"><p>Phase 4 CI is shipped (local smoke PASS; GH runner pending billing fix). Next priority: faithfulness recovery on guidebook (0.629 → 0.90) without relevancy loss. Second: independent Claude-as-judge for faithfulness scoring.</p></div><a class="fu-back" href="#q-35">↑ Back to Q35</a></div>
-<div class="fu-answer-block" id="fu-35-2"><h4 class="fu-q">90-day roadmap?</h4><div class="fu-answer"><p>Days 1–30 done: full guidebook re-eval (164848), Phase 4 CI shipped. Days 31–60: faithfulness recovery, human-judge overlap. Days 61–90: semantic query cache, p95 dashboard, ACL filters, nightly golden run.</p></div><a class="fu-back" href="#q-35">↑ Back to Q35</a></div>
+<div class="fu-answer-block" id="fu-35-1"><h4 class="fu-q">First priority if hired?</h4><div class="fu-answer"><p>Phase 4 CI is green on GitHub (run 27804469869). Faithfulness prompt tuning dd40b86 attempted (run 055058: faith 0.543). Next priority: code/currency retrieval fixes, then faith recovery toward 0.90 without relevancy loss. Second: independent Claude-as-judge for faithfulness scoring.</p></div><a class="fu-back" href="#q-35">↑ Back to Q35</a></div>
+<div class="fu-answer-block" id="fu-35-2"><h4 class="fu-q">90-day roadmap?</h4><div class="fu-answer"><p>Days 1–30 done: guidebook gate 164848, Phase 4 CI green on GH, faithfulness tuning dd40b86 (055058). Days 31–60: code/currency retrieval + faith recovery, human-judge overlap. Days 61–90: semantic query cache, p95 dashboard, ACL filters, nightly golden run.</p></div><a class="fu-back" href="#q-35">↑ Back to Q35</a></div>
 </article>
 <article class="fu-group" id="fu-group-36"><h3 class="fu-parent"><span class="fu-parent-num">Q36</span> Why ReAct agent vs always-on RAG?</h3><p class="fu-parent-cat">Agentic / Workflow · <a href="#q-36">↑ parent question</a></p>
 <div class="fu-answer-block" id="fu-36-1"><h4 class="fu-q">When does agent skip retrieval?</h4><div class="fu-answer"><p>Greetings, meta questions, and clarifications skip policy_search—the agent answers from system prompt. Substantive policy questions invoke policy_search which runs full build_query_engine() pipeline (k=30, rerank, guard). Same stack, no duplicate retrieval code in agent.py.</p></div><a class="fu-back" href="#q-36">↑ Back to Q36</a></div>

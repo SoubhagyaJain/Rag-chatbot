@@ -84,7 +84,7 @@ add_qs("opening", [
      ["Intended use: internal HR policy + AI guidebook Q&A on indexed PDFs.",
       "Failure modes: unsupported claims, over-abstention, wrong citation sources, vocabulary mismatch, incomplete enumeration lists, code hallucination.",
       "Mitigations: faithfulness guard, mandatory [Source N], balanced vs strict modes, hybrid BM25, corpus scoping, code validation pipeline, eval harness.",
-      "Known limits: 7B local model; guidebook faithfulness 0.629 vs 0.90 target; code-query rel 0.525 on full guidebook run; policy faithfulness 0.807 vs 0.90; CPU e2e p50 53.5s."],
+      "Known limits: 7B local model; guidebook faith 0.629 baseline (055058 tuning: 0.543); code bucket faith 0.25 on 055058; policy faith 0.807; CPU e2e p50 53.5s."],
      "prompts.py, generation.py, README.md limitations", ["Residual risk?", "Human escalation path?"], "opening"),
 ])
 
@@ -262,10 +262,10 @@ add_qs("production", [
       "Streamlit binds 0.0.0.0 — required for port mapping."],
      "docker-compose.yml, .streamlit/config.toml", ["Ollama in-compose variant?", "Model versioning?"], "production"),
     ("What's missing for true production?", "Calibration — Anthropic values honesty.",
-     ["Phase 4 CI shipped: rag-ci.yml (pytest + ci_eval_gate.py retrieval smoke); local smoke PASS; GH runner blocked on billing.",
+     ["Phase 4 CI green on GitHub (run 27804469869): pytest + ci_eval_gate.py retrieval smoke.",
       "No production drift monitoring; no ACL per user.",
       "Benchmarked p50/p95 on golden set (53.5s/58.8s e2e) — no live-traffic metrics yet; CPU-only default.",
-      "Hybrid BM25 shipped; guidebook rel gate passed; faithfulness 0.629 still below 0.90 target."],
+      "Faithfulness tuning dd40b86 (055058): faith 0.543 vs baseline 0.629; next: code/currency retrieval."],
      "README2 open items", ["First priority if hired?", "90-day roadmap?"], "production"),
 ])
 
@@ -317,7 +317,7 @@ add_qs("tradeoffs", [
       "Limitation: same model family — note in interview."],
      "evaluation.py judge_answer_relevancy", ["Inter-rater agreement?", "Claude as judge?"], "tradeoffs"),
     ("If you had 2 more weeks?", "Prioritization.",
-     ["Phase 4 CI done — next: faithfulness recovery on guidebook (0.629 → 0.90) without relevancy loss.",
+     ["Phase 4 CI green on GH. Faith tuning dd40b86 attempted (055058: faith 0.543). Next: code/currency retrieval, then faith ≥ 0.90 without relevancy loss.",
       "Independent Claude-as-judge for faithfulness scoring.",
       "Semantic query cache + timing dashboard (Phase 4 tasks 7–8, deferred).",
       "Live-traffic p95 dashboard (golden-set benchmark done: 58.8s e2e p95)."],
@@ -526,7 +526,7 @@ SVG_EVAL = '''<svg class="b3b-svg" viewBox="0 0 800 320" xmlns="http://www.w3.or
 
 SVG_GEN = '''<svg class="b3b-svg" viewBox="0 0 900 300" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="dg" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#fff" opacity="0.06"/></pattern><marker id="arg" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#FFFF00"/></marker></defs><rect width="900" height="300" fill="#0c0e14"/><rect width="900" height="300" fill="url(#dg)"/><rect x="20" y="110" width="130" height="56" rx="8" fill="#58C4DD" fill-opacity="0.15" stroke="#58C4DD"/><text class="node-label" x="85" y="135" text-anchor="middle">_gen_interview</text><text class="node-sub" x="85" y="152" text-anchor="middle">notes.py</text><path class="flow-arrow" d="M150 138 L185 138" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="185" y="110" width="120" height="56" rx="8" fill="#83C167" fill-opacity="0.15" stroke="#83C167"/><text class="node-label" x="245" y="142" text-anchor="middle">add_qs()</text><path class="flow-arrow" d="M305 138 L340 138" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="340" y="110" width="100" height="56" rx="8" fill="#FF862F" fill-opacity="0.15" stroke="#FF862F"/><text class="node-label" x="390" y="142" text-anchor="middle">q()</text><path class="flow-arrow" d="M440 138 L475 138" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="475" y="100" width="130" height="76" rx="8" fill="#9A72AC" fill-opacity="0.15" stroke="#9A72AC"/><text class="node-label" x="540" y="128" text-anchor="middle">f-string</text><text class="node-sub" x="540" y="148" text-anchor="middle">+ project-plans CSS</text><path class="flow-arrow" d="M605 125 C650 80, 700 55, 740 55" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><path class="flow-arrow" d="M605 152 C650 195, 700 220, 740 220" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="740" y="30" width="145" height="48" rx="8" fill="#83C167" fill-opacity="0.2" stroke="#83C167" stroke-width="2"/><text class="node-label" x="812" y="58" text-anchor="middle">interview-notes.html</text><rect x="740" y="195" width="145" height="48" rx="8" fill="#58C4DD" fill-opacity="0.2" stroke="#58C4DD" stroke-width="2"/><text class="node-label" x="812" y="223" text-anchor="middle">gen-interview-notes.html</text><text font-family="IBM Plex Sans,sans-serif" font-size="10" fill="rgba(255,255,255,0.4)" x="450" y="275" text-anchor="middle">49 questions · 8 categories · Anthropic solo AI/ML engineer focus</text></svg>'''
 
-PITCH = """Employees need policy answers they can trust and verify — not confident hallucinations. As a solo AI/ML engineer, I built an evaluation-first RAG system across two corpora (308 chunks): hybrid BM25+dense retrieval, rerank, grounded generation, faithfulness guard, code validation, and citation-filtered UI. On the 15-case policy benchmark I recovered relevancy from 0.40 to 0.747 (+87%) while raising context precision to 0.80. On the guidebook track I fixed cross-corpus bleed, passed the full 35-case relevancy gate at 0.700 (run 164848), and raised enumeration relevancy to 0.84. The key insight for alignment work: maximizing faithfulness alone collapsed relevancy to 0.42; I measured that Pareto frontier explicitly instead of optimizing one headline metric."""
+PITCH = """Employees need policy answers they can trust and verify — not confident hallucinations. As a solo AI/ML engineer, I built an evaluation-first RAG system across two corpora (308 chunks): hybrid BM25+dense retrieval, rerank, grounded generation, faithfulness guard, code validation, and citation-filtered UI. On the policy benchmark I recovered relevancy from 0.40 to 0.747 (+87%). On the guidebook track I passed the 35-case relevancy gate at 0.700 (run 164848) and shipped Phase 4 CI green on GitHub. Faithfulness prompt tuning (dd40b86) taught me prompt-only fixes are insufficient when retrieval misses code chunks — I measured that honestly (run 055058: faith 0.543) instead of hiding regressions."""
 
 html = f'''<!DOCTYPE html>
 <html lang="en">
@@ -658,7 +658,7 @@ html = f'''<!DOCTYPE html>
         </article>
         <article class="card">
           <h3>Generation — <code>src/generation.py</code></h3>
-          <p><code>GroundedCompactAndRefine</code> → <code>normalize_balanced_answer()</code> → <code>apply_faithfulness_guard()</code> → <code>code_validation.py</code>. Balanced reject keeps answer.</p>
+          <p><code>GroundedCompactAndRefine</code> → <code>normalize_balanced_answer()</code> → <code>apply_faithfulness_guard()</code> (<code>FAITHFULNESS_GUARD_REJECT_ACTION</code>: keep/trim/abstain) → <code>code_validation.py</code>. Default keep preserves relevancy.</p>
         </article>
         <article class="card">
           <h3>Prompts — <code>src/prompts.py</code></h3>
@@ -714,7 +714,7 @@ html = f'''<!DOCTYPE html>
             <li><strong>Reliability:</strong> fail-open rewrite, reranker graceful degradation, probe_chroma_index(), citation score fallback capped</li>
             <li><strong>Observability:</strong> app.log, citation pipeline stages, eval JSON append-only</li>
             <li><strong>Tests:</strong> 182 pytest across generation, citations, prompts, eval, chroma, code validation, retrieval scope</li>
-            <li><strong>Gaps (say honestly):</strong> GH Actions blocked on billing (local ci_eval_gate.py PASS); no drift monitoring; no live-traffic p50/p95 (golden-set benchmark: 53.5s e2e p50), CPU-only default</li>
+            <li><strong>Gaps (say honestly):</strong> guidebook faith 0.629 baseline (055058 tuning: 0.543); code/currency retrieval misses; no drift monitoring; golden-set e2e p50 53.5s, CPU-only default</li>
           </ul>
         </div>
       </section>
@@ -758,6 +758,7 @@ html = f'''<!DOCTYPE html>
           <tr><td>152255</td><td>Guidebook post-tuning (35 cases)</td><td>0.657</td><td>0.564</td><td>0.629</td></tr>
           <tr><td>160052</td><td>Enumeration subset (5 cases)</td><td class="high-score">1.00</td><td>—</td><td class="high-score">0.84</td></tr>
           <tr class="highlight-row"><td>164848</td><td>Full guidebook post-enumeration</td><td>0.771</td><td>0.629</td><td class="high-score">0.700</td></tr>
+          <tr><td>055058</td><td>Faithfulness prompt tuning (dd40b86)</td><td>0.800</td><td>0.543</td><td>0.666</td></tr>
         </table></div>
         <p>Policy per-case: sick_leave relevancy 0.0→0.90. Guidebook: 0.629→0.700 on full 35-case run; enumeration bucket rel 0.84.</p>
       </section>
@@ -765,7 +766,7 @@ html = f'''<!DOCTYPE html>
       <section id="s10">
         <h2>10. Future Improvements</h2>
         <ul class="bullets">
-          <li>Phase 4 CI shipped (rag-ci.yml + ci_eval_gate.py); local smoke PASS — GH runner pending billing fix</li>
+          <li>Phase 4 CI green on GitHub (run 27804469869); faithfulness tuning dd40b86 (055058)</li>
           <li>Faithfulness ≥0.90 without relevancy loss — tighter generation, not more abstention (guidebook 0.629 today)</li>
           <li>Independent Claude-as-judge; per-user ACL metadata filters; GPU latency path</li>
         </ul>
@@ -830,7 +831,7 @@ html = f'''<!DOCTYPE html>
             <li>Guidebook faithfulness 0.629 vs 0.90 target; code-query rel 0.525 (run 164848)</li>
             <li>Policy faithfulness 0.807 vs 0.90 target on best balanced run</li>
             <li>7B local model limits; CPU e2e p50 53.5s; no production traffic metrics</li>
-            <li>LLM judge not independent from generator; GH Actions CI pending billing resolution</li>
+            <li>LLM judge not independent from generator; guidebook faith 0.629 baseline (055058: 0.543)</li>
           </ul>
           <h3 class="red-flag">Red flags to avoid</h3>
           <ul class="bullets">
@@ -850,7 +851,7 @@ html = f'''<!DOCTYPE html>
             <li><strong>Resolved:</strong> Git-derived timeline — ~0.5 weeks span, 13 eval runs in 5.4h (docs/project_timeline.json)</li>
             <li><strong>Resolved:</strong> Measured p50/p95 — e2e 53.5s / 58.8s on 5 golden cases (logs/latency_benchmark.json)</li>
             <li><strong>Resolved:</strong> Hybrid BM25 shipped; corpus scoping; code validation 100% pass (143246); guidebook rel gate 0.700 (164848)</li>
-            <li><strong>Remaining:</strong> Independent judge (Claude API); GH Actions green run; faithfulness recovery on guidebook</li>
+            <li><strong>Remaining:</strong> Independent judge (Claude API); code/currency retrieval fixes; faithfulness recovery on guidebook</li>
           </ul>
         </div>
       </section>

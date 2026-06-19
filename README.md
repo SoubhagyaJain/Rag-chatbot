@@ -53,9 +53,9 @@ This is a **serious engineering baseline**, not a toy chatbot. Expect to tune on
 
 | Capability | Typical result | Why it matters |
 |------------|----------------|----------------|
-| **Context Precision** | ~0.82 | Reranker + score filter keep noise out of the LLM context |
-| **Faithfulness** | 0.90–1.0 (mode-dependent) | Strict prompts + guard reduce hallucination on policy text |
-| **Hit rate** | ~0.87 | Retrieval usually finds *something* relevant |
+| **Context Precision** | ~0.59–0.82 (corpus-dependent) | Reranker + score filter keep noise out of the LLM context |
+| **Faithfulness** | Policy **0.807**; guidebook **0.629** (`164848`) | Balanced mode; strict ~1.0 but relevancy ~0.42 |
+| **Hit rate** | ~0.77–0.87 | Retrieval usually finds *something* relevant |
 | **Citations** | `[Source N]` tags + section/page metadata | UI shows only sources cited in the answer |
 
 ### Known weaknesses (be honest)
@@ -71,7 +71,7 @@ This is a **serious engineering baseline**, not a toy chatbot. Expect to tune on
 
 | Mode | Use when | Trade-off |
 |------|----------|-----------|
-| **Balanced** (default) | Internal HR / policy Q&A | Faithfulness ≥ 0.90 target, better relevancy |
+| **Balanced** (default) | Internal HR / policy Q&A | Policy faith ~0.80; guidebook faith ~0.63 — tune via eval |
 | **Strict** | Compliance review, legal audit trails | Faithfulness ~1.0, more abstention |
 
 ```bash
@@ -277,7 +277,7 @@ python scripts/ci_eval_gate.py
 
 Dataset: `data/eval/golden_subset_ci_smoke.json`. Floors: `data/eval/ci_smoke_baseline.json` (hit ≥ 0.75, precision ≥ 0.50, recall ≥ 0.55).
 
-> **Note:** GitHub Actions may not run until account billing is resolved at https://github.com/settings/billing. Use the local gate above in the meantime.
+**Latest green run:** [#27804469869](https://github.com/SoubhagyaJain/Rag-chatbot/actions/runs/27804469869) — `unit-tests` 182/182 + `eval-smoke` PASS (hit **1.000**, prec **0.896**, rec **0.667**). CI smoke is retrieval-only; faithfulness is not gated in CI today.
 
 ---
 
@@ -461,8 +461,11 @@ Code: `src/prompts.py`, `src/generation.py`, `src/code_validation.py`.
 - **Balanced:** synthesize related excerpts; partial answers with *"Based on the available information…"*
 - **Strict:** word-for-word grounding; aggressive abstention
 - **Guard:** rejects clear hallucinations (balanced: SUPPORTED/UNSUPPORTED; strict: YES/NO)
+- **Reject action:** `FAITHFULNESS_GUARD_REJECT_ACTION=keep` (default) keeps answer on reject to preserve relevancy; `trim` removes unsupported claims; `abstain` replaces with insufficient-info (audit only)
 
 Disable guard for A/B only: `FAITHFULNESS_GUARD_MODE=off`.
+
+Prompt rules **19b–25** in `src/prompts.py` target pattern disambiguation, code verbatim, URL/link grounding, and agent-role naming (faithfulness tuning, commit `dd40b86`).
 
 **Phase 3 env vars** (defaults shown):
 
@@ -521,7 +524,7 @@ All settings in `src/config.py`, overridable via `.env`. Grouped for scannabilit
 | **Chunking** | `CHUNK_SIZE`, `CHUNK_OVERLAP`, `ENABLE_SECTION_DETECTION` | 640, 64, true |
 | **Retrieval** | `RETRIEVAL_CANDIDATE_K`, `RERANKER_TOP_N`, `RERANKER_MODEL`, `ENABLE_QUERY_REWRITE` | 30, 6, bge-reranker-large, true |
 | **Rerank filter** | `ENABLE_RERANK_SCORE_FILTER`, `RERANK_MIN_SCORE_RATIO`, `RERANK_MIN_KEEP` | true, 0.40, 3 |
-| **Grounding** | `GROUNDING_STRICTNESS`, `FAITHFULNESS_GUARD_MODE`, `RESPONSE_PROMPT_VERSION` | balanced, balanced, v2_balanced |
+| **Grounding** | `GROUNDING_STRICTNESS`, `FAITHFULNESS_GUARD_MODE`, `FAITHFULNESS_GUARD_REJECT_ACTION`, `RESPONSE_PROMPT_VERSION` | balanced, balanced, keep, v2_balanced |
 | **Code validation** | `ENABLE_CODE_VALIDATION`, `ENABLE_CODE_SELF_CORRECTION`, `CODE_SELF_CORRECTION_MAX_RETRIES` | true, true, 1 |
 | **Citations** | `SHOW_CITATIONS`, `CITATION_FORMAT`, `CITATION_MIN_RELEVANCE_RATIO` | true, section_first, 0.55 |
 | **Eval** | `EVAL_USE_LLM_JUDGE`, `EVAL_LLM_MODEL` | true, qwen2.5:7b |
@@ -582,7 +585,7 @@ company_policy_rag/
 | Golden eval, reranker, faithfulness guard, conversation memory, hybrid BM25, parent retrieval, code validation | Semantic query cache |
 | Chroma incremental indexing | Semantic query cache |
 | Section-aware metadata | Per-team ACL filters |
-| Streamlit UI, citation pipeline, balanced relevancy recovery | Faithfulness ≥ 0.90 without relevancy loss |
+| Streamlit UI, citation pipeline, balanced relevancy recovery, Phase 4 CI green on GH | Guidebook faith ≥ 0.90 (baseline 0.629); code/currency retrieval fixes |
 | LlamaIndex 0.14 agent migration | GPU Docker variant |
 | Docker (Streamlit + host Ollama) | Ollama-in-compose option |
 | Chroma telemetry fix, index health probe | Per-user ACL filters |

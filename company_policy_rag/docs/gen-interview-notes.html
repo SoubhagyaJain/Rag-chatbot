@@ -1114,7 +1114,7 @@
   <div class="src-body">
     <div class="src-field"><span class="src-label">Category key</span><code>opening</code></div>
     <div class="src-field"><span class="src-label">Why they ask</span><p>Tests safety documentation thinking.</p></div>
-    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>Intended use: internal HR policy + AI guidebook Q&amp;A on indexed PDFs.</li><li>Failure modes: unsupported claims, over-abstention, wrong citation sources, vocabulary mismatch, incomplete enumeration lists, code hallucination.</li><li>Mitigations: faithfulness guard, mandatory [Source N], balanced vs strict modes, hybrid BM25, corpus scoping, code validation pipeline, eval harness.</li><li>Known limits: 7B local model; guidebook faithfulness 0.629 vs 0.90 target; code-query rel 0.525 on full guidebook run; policy faithfulness 0.807 vs 0.90; CPU e2e p50 53.5s.</li></ul></div>
+    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>Intended use: internal HR policy + AI guidebook Q&amp;A on indexed PDFs.</li><li>Failure modes: unsupported claims, over-abstention, wrong citation sources, vocabulary mismatch, incomplete enumeration lists, code hallucination.</li><li>Mitigations: faithfulness guard, mandatory [Source N], balanced vs strict modes, hybrid BM25, corpus scoping, code validation pipeline, eval harness.</li><li>Known limits: 7B local model; guidebook faith 0.629 baseline (055058 tuning: 0.543); code bucket faith 0.25 on 055058; policy faith 0.807; CPU e2e p50 53.5s.</li></ul></div>
     <div class="src-field"><span class="src-label">Code reference</span><code>prompts.py, generation.py, README.md limitations</code></div>
     <div class="src-field"><span class="src-label">Follow-ups</span><ul class="src-follow"><li>Residual risk?</li><li>Human escalation path?</li></ul></div>
   </div>
@@ -1444,7 +1444,7 @@
   <div class="src-body">
     <div class="src-field"><span class="src-label">Category key</span><code>production</code></div>
     <div class="src-field"><span class="src-label">Why they ask</span><p>Calibration — Anthropic values honesty.</p></div>
-    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>Phase 4 CI shipped: rag-ci.yml (pytest + ci_eval_gate.py retrieval smoke); local smoke PASS; GH runner blocked on billing.</li><li>No production drift monitoring; no ACL per user.</li><li>Benchmarked p50/p95 on golden set (53.5s/58.8s e2e) — no live-traffic metrics yet; CPU-only default.</li><li>Hybrid BM25 shipped; guidebook rel gate passed; faithfulness 0.629 still below 0.90 target.</li></ul></div>
+    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>Phase 4 CI green on GitHub (run 27804469869): pytest + ci_eval_gate.py retrieval smoke.</li><li>No production drift monitoring; no ACL per user.</li><li>Benchmarked p50/p95 on golden set (53.5s/58.8s e2e) — no live-traffic metrics yet; CPU-only default.</li><li>Faithfulness tuning dd40b86 (055058): faith 0.543 vs baseline 0.629; next: code/currency retrieval.</li></ul></div>
     <div class="src-field"><span class="src-label">Code reference</span><code>README2 open items</code></div>
     <div class="src-field"><span class="src-label">Follow-ups</span><ul class="src-follow"><li>First priority if hired?</li><li>90-day roadmap?</li></ul></div>
   </div>
@@ -1543,7 +1543,7 @@
   <div class="src-body">
     <div class="src-field"><span class="src-label">Category key</span><code>tradeoffs</code></div>
     <div class="src-field"><span class="src-label">Why they ask</span><p>Prioritization.</p></div>
-    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>Phase 4 CI done — next: faithfulness recovery on guidebook (0.629 → 0.90) without relevancy loss.</li><li>Independent Claude-as-judge for faithfulness scoring.</li><li>Semantic query cache + timing dashboard (Phase 4 tasks 7–8, deferred).</li><li>Live-traffic p95 dashboard (golden-set benchmark done: 58.8s e2e p95).</li></ul></div>
+    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>Phase 4 CI green on GH. Faith tuning dd40b86 attempted (055058: faith 0.543). Next: code/currency retrieval, then faith ≥ 0.90 without relevancy loss.</li><li>Independent Claude-as-judge for faithfulness scoring.</li><li>Semantic query cache + timing dashboard (Phase 4 tasks 7–8, deferred).</li><li>Live-traffic p95 dashboard (golden-set benchmark done: 58.8s e2e p95).</li></ul></div>
     <div class="src-field"><span class="src-label">Code reference</span><code>README2 roadmap</code></div>
     <div class="src-field"><span class="src-label">Follow-ups</span><ul class="src-follow"><li>What would you cut?</li><li>Ship vs perfect?</li></ul></div>
   </div>

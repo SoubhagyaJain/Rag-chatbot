@@ -6,7 +6,7 @@
 > - **Engineering journey & lessons:** [README2.md](README2.md)
 > - **This document:** completion status, metrics gap, prioritized backlog
 
-**Report date:** 2026-06-18  
+**Report date:** 2026-06-19  
 **Index snapshot:** 308 Chroma chunks | 182 tests | 60 golden cases (25 policy + 35 guidebook)
 
 ---
@@ -35,11 +35,11 @@
 | **Core RAG stack** (ingest → retrieve → generate → cite → UI) | **~85%** | All major modules implemented and tested |
 | **5-phase infrastructure roadmap** (Track A) | **~70%** | Phases 1–3 done; Phase 4 CI (tasks 5–6) shipped; tasks 7–8 deferred |
 | **Relevancy recovery journey** (Track B) | **~95%** | Phases 1–6 complete per README2 |
-| **Production readiness** (CI, monitoring, ACL, validated metrics) | **~50%** | GitHub Actions pytest + retrieval smoke gate wired; monitoring/ACL still open |
+| **Production readiness** (CI, monitoring, ACL, validated metrics) | **~55%** | GitHub Actions green (pytest + retrieval smoke); monitoring/ACL still open |
 
-**Bottom line:** P0 validation and guidebook quality gates are **complete** on the 308-chunk stack. Full 35-case guidebook relevancy hit **0.700** (run `164848`). **Phase 4 CI tasks 5–6 shipped:** `.github/workflows/rag-ci.yml` (pytest + `ci_eval_gate.py` retrieval smoke on 8-case stratified subset). Remaining quality gap: faithfulness **0.629** vs 0.90 target; code-query relevancy **0.525** on full guidebook run.
+**Bottom line:** P0 validation and guidebook relevancy gate are **complete** on the 308-chunk stack (run `164848`, rel **0.700**). **Phase 4 CI tasks 5–6 validated on GitHub** (run [#27804469869](https://github.com/SoubhagyaJain/Rag-chatbot/actions/runs/27804469869)). Faithfulness prompt tuning (`dd40b86`, run `055058`) did **not** improve aggregate faith (**0.543** vs baseline **0.629**). **Next lever:** retrieval for code/currency cases (`currency_tool_example`, `tools_real_world`).
 
-### Verified system facts (2026-06-18)
+### Verified system facts (2026-06-19)
 
 | Item | Value | Source |
 |------|-------|--------|
@@ -51,12 +51,11 @@
 | Guidebook-only golden set | **35 cases** | `golden_dataset_guidebook.json` (project root) |
 | Weak-case subset | **10 cases** | `data/eval/golden_subset_weak_guidebook.json` |
 | Latest full eval run | `20260618_133725` — **60 cases** | `logs/evaluation_results.json` |
-| Latest guidebook eval | `20260618_132316` — **35 cases** | `logs/evaluation_guidebook.json` |
-| Post-reindex weak subset | `20260618_140509` — **10 cases** | `logs/evaluation_subset_weak.json` |
-| Post code-validation tuning | `20260618_143246` — **10 cases** | `logs/evaluation_subset_weak_v2.json` — code pass **100%**, fallback **0%** |
-| Full guidebook post-tuning | `20260618_152255` — **35 cases** | `logs/evaluation_guidebook_post_tuning.json` — rel **0.629**, fallback **0%** |
-| Full guidebook post-enumeration | `20260618_164848` — **35 cases** | `logs/evaluation_guidebook_enumeration_tuning.json` — rel **0.700**, hit **0.771**, enum rel **0.84**, fallback **0%** |
-| Historical best (15 policy, old index) | rel **0.747**, faith **0.807**, prec **0.80** | Run `20260617_104356` |
+| Guidebook relevancy gate (baseline) | `20260618_164848` — rel **0.700**, faith **0.629** | `logs/evaluation_guidebook_enumeration_tuning.json` |
+| Faithfulness tuning eval | `20260619_055058` — rel **0.666**, faith **0.543** | `logs/evaluation_guidebook_faith_tuning.json` — commit `dd40b86` |
+| GitHub CI green run | [#27804469869](https://github.com/SoubhagyaJain/Rag-chatbot/actions/runs/27804469869) | `unit-tests` 182/182 + `eval-smoke` PASS |
+| CI smoke metrics | hit **1.000**, prec **0.896**, rec **0.667** | 8-case `golden_subset_ci_smoke.json` |
+| Historical best (policy, 25 cases) | rel **0.747**, faith **0.807**, prec **0.80** | Run `20260617_104356` |
 | E2E latency (CPU, 5-case benchmark) | p50 **53.5s** / p95 **58.8s** | `logs/latency_benchmark.json` |
 
 ### Completion breakdown
@@ -185,9 +184,9 @@ Status key: **Done** = implemented + tested | **Partial** = shipped but not full
 | LLM-as-judge (faithfulness + relevancy) | **Done** | `src/evaluation.py` |
 | Phase 3 eval aggregates | **Done** | `code_validation_pass_rate`, `low_confidence_fallback_rate` |
 | Failure mode analyzer | **Done** | `scripts/analyze_eval_failures.py` |
-| Full 60-case eval on current stack | **Partial** | **Not logged** — validation debt |
-| Guidebook-only eval on current stack | **Partial** | **Not logged** |
-| CI eval gate on PR | **Planned** | No pipeline today |
+| Full 60-case eval on current stack | **Partial** | Last logged `133725`; re-run after major pipeline changes |
+| Guidebook-only eval on current stack | **Done** | Runs `164848`, `055058` logged |
+| CI eval gate on PR | **Done** | `.github/workflows/rag-ci.yml` green on GH (run `27804469869`) |
 | Human-judge agreement study | **Partial** | `scripts/compare_human_judge.py` exists; not run recently |
 
 ### Operations and deployment
@@ -231,7 +230,7 @@ Status key: **Done** = implemented + tested | **Partial** = shipped but not full
 | Eval history | Run `20260618_132316` (35 cases); weak subset `20260618_140509` (10 cases) |
 | Phase 3 stress | **High** — code validation pass rate **0%**; fallback rate **14.3%** (baseline) |
 
-**Assessment:** Ingestion metadata is **fixed**. Enumeration tuning raised full-guidebook relevancy **0.629 → 0.700** (`152255` → `164848`); enumeration bucket rel **0.84**, hit **1.00**. Remaining weak spots: **code** queries (rel **0.525**), **workflow** (rel **0.567**), faithfulness **0.629** vs 0.90 target.
+**Assessment:** Ingestion metadata is **fixed**. Enumeration tuning raised full-guidebook relevancy **0.629 → 0.700** (`152255` → `164848`); enumeration bucket rel **0.84**, hit **1.00**. Faithfulness prompt tuning (`055058`) did not beat baseline faith **0.629** (aggregate **0.543**). Remaining weak spots: **code** bucket (faith **0.25**, rel **0.325** on `055058`), **currency** retrieval misses (`tools_real_world`, `currency_tool_example`).
 
 ### Combined index implications
 
@@ -245,16 +244,18 @@ This is the **most important section** of README3. Several README claims use his
 
 ### Targets vs measured (current 308-chunk stack)
 
-| Metric | Target | `164848` guidebook | `160052` enum×5 | `143246` code weak |
-|--------|--------|-------------------|---------------|-------------------|
-| Hit rate | > 0.85 | 0.771 | **1.000** ✓ | 0.800 |
-| Context precision | > 0.50 | **0.594** ✓ | **1.000** ✓ | 0.647 ✓ |
-| Context recall | > 0.60 | **0.690** ✓ | **0.933** ✓ | 0.533 |
-| Faithfulness | ≥ 0.90 | 0.629 | 0.500 | 0.450 |
-| Answer relevancy | ≥ 0.75 | **0.700** ✓ (gate) | **0.840** ✓ | 0.370 |
-| Code validation pass rate | ≥ 0.90 | — | — | **1.000** ✓ |
+| Metric | Target | `164848` baseline | `055058` faith tuning | `160052` enum×5 |
+|--------|--------|-------------------|----------------------|-----------------|
+| Hit rate | > 0.85 | 0.771 | 0.800 | **1.000** ✓ |
+| Context precision | > 0.50 | **0.594** ✓ | **0.625** ✓ | **1.000** ✓ |
+| Context recall | > 0.60 | **0.690** ✓ | **0.700** ✓ | **0.933** ✓ |
+| Faithfulness | ≥ 0.90 | 0.629 | 0.543 | 0.500 |
+| Answer relevancy | ≥ 0.75 | **0.700** ✓ (gate) | 0.666 | **0.840** ✓ |
+| Code validation pass rate | ≥ 0.90 | — | **1.000** ✓ | — |
 | Low-confidence fallback rate | < 0.05 | **0.000** ✓ | **0.000** ✓ | **0.000** ✓ |
-| Enumeration relevancy | ≥ 0.70 | **0.840** ✓ | **0.840** ✓ | — |
+| Enumeration relevancy | ≥ 0.70 | **0.840** ✓ | **0.780** ✓ | **0.840** ✓ |
+
+**Faith tuning (`055058`, commit `dd40b86`):** prompt rules 19b–25 + optional claim-trim guard (`FAITHFULNESS_GUARD_REJECT_ACTION`, default `keep`). Per-case faith vs `164848`: **2 improved / 8 regressed / 25 unchanged**. Win: `manager_agent` faith **1.0**.
 
 **By corpus (full 60-case run `133725`):** policy rel **0.716**, guidebook rel **0.534**, guidebook fallback **11.4%**.
 
@@ -287,6 +288,8 @@ This is the **most important section** of README3. Several README claims use his
 
 **By query type (`164848`):** factual rel **0.725**, enumeration **0.84**, code **0.525**, pattern **0.75**, workflow **0.567**, edge_case **0.80**.
 
+**By query type (`055058`):** code faith **0.25** / rel **0.325** (worst bucket); pattern faith **0.667**; enumeration rel **0.78**.
+
 ### Validation status
 
 | P0 item | Status |
@@ -297,6 +300,8 @@ This is the **most important section** of README3. Several README claims use his
 | Guidebook re-index (`section_path` + `content_type`) | **Done** — 0% unknown |
 | Weak-subset post-reindex eval | **Done** (`20260618_140509`) |
 | Full guidebook re-eval post-enumeration (`164848`) | **Done** — rel **0.700**, gate passed |
+| Faithfulness prompt tuning (`055058`) | **Done** — no aggregate improvement; see §7 task 16 |
+| GitHub CI green run (`27804469869`) | **Done** — billing resolved |
 
 Refresh commands:
 
@@ -316,7 +321,8 @@ python scripts/evaluate.py --dataset data/eval/golden_subset_weak_guidebook.json
 | “Code validation pass rate ≥ 0.90” | **No** — 0% on all measured runs |
 | “Relevancy ≥ 0.75 on production index” | **No** — best full-run 0.610 |
 | “Guidebook RAG quality acceptable” | **No** — rel 0.571 baseline, 0.450 weak subset |
-| “Faithfulness ≥ 0.90 in balanced mode” | **No** — 0.733 full run |
+| “Faithfulness ≥ 0.90 in balanced mode” | **No** — guidebook **0.629** baseline (`164848`); policy best **0.807** (`104356`) |
+| “GitHub Actions CI green” | **Yes** — run `27804469869` (pytest + retrieval smoke) |
 
 ---
 
@@ -384,9 +390,10 @@ python scripts/evaluate.py --dataset data/eval/golden_subset_weak_guidebook.json
 | 13 | Tune code validation (reduce false-positive fallbacks) | **Done** 2026-06-18 | Weak subset `143246`: pass **100%**, fallback **0%**; `answer_only` trigger + `strip_code` fail mode |
 | 14 | Corpus-scoped retrieval filter (`source_file` / `document_type`) | **Done** 2026-06-18 | `src/retrieval_scope.py`; eval scopes by case corpus; no handbook bleed on `role_playing_block` |
 | 15 | Enumeration prompt / comprehensive-list tuning | **Done** 2026-06-18 | Subset `160052`: enum rel **0.84**; full 35-case `164848`: rel **0.700** (gate passed) |
-| 16 | Simultaneous relevancy ≥ 0.75 + faithfulness ≥ 0.90 | Ongoing | 60-case eval aggregates |
+| 16 | Simultaneous relevancy ≥ 0.75 + faithfulness ≥ 0.90 | **Ongoing** | Prompt tuning `dd40b86` (`055058`): faith **0.543**, rel **0.666** — no gate pass; claim-trim tested, default `keep` |
 | 17 | Human-judge overlap (5–10 cases) | 4 hrs | `scripts/compare_human_judge.py` report |
 | 18 | Nightly full golden run + trend alert | 1 day | Slack/email on >5% metric drop |
+| 19 | Code/currency retrieval boost | 1–2 days | `content_type=code` filter or query augmentation; fix `currency_tool_example`, `tools_real_world` misses |
 
 ---
 
@@ -467,8 +474,8 @@ flowchart TB
 
 | Window | Focus | Deliverables |
 |--------|-------|--------------|
-| **Days 1–30** | **Done** — validation + CI | Guidebook gate `164848` (rel 0.700); Phase 4 CI tasks 5–6 shipped; local smoke PASS |
-| **Days 31–60** | Faithfulness recovery | Guidebook faith 0.629 → ≥0.75 without relevancy loss; independent judge experiments |
+| **Days 1–30** | **Done** — validation + CI | Guidebook gate `164848` (rel 0.700); Phase 4 CI green on GH (`27804469869`); faithfulness prompt tuning `dd40b86` attempted |
+| **Days 31–60** | Retrieval + faith recovery | Code/currency retrieval fixes; guidebook faith 0.629 → ≥0.75 without relevancy loss; independent judge experiments |
 | **Days 61–90** | Phase 4 remainder + Phase 5 | Semantic cache (task 7); timing dashboard (task 8); ACL filter prototype; nightly golden run |
 
 ### Decision gates
@@ -477,7 +484,7 @@ flowchart TB
 |------|------------------|
 | **Internal beta** | 60-case eval logged; no P0 retrieval misses on policy factual cases |
 | **Guidebook GA** | Guidebook eval: relevancy ≥ 0.70, code validation pass ≥ 0.85 |
-| **Production pilot** | CI gate live on GitHub (wired + locally verified; GH runner pending billing fix); p95 e2e < 15s (GPU) or documented SLA; ACL for legal vs HR |
+| **Production pilot** | CI gate live on GitHub (**green** run `27804469869`); p95 e2e < 15s (GPU) or documented SLA; ACL for legal vs HR; faithfulness ≥ 0.75 on guidebook |
 
 ---
 
@@ -508,6 +515,7 @@ python -c "import json; d=json.load(open('logs/evaluation_results.json')); r=d['
 | 2026-06-18 | Initial README3 — dual phase frameworks, validation debt documented, 308-chunk snapshot |
 | 2026-06-18 | P0 complete — baseline evals `132316`/`133725`, guidebook re-index (0% unknown `section_path`), weak subset `140509`, failure buckets in §5 |
 | 2026-06-18 | Session close — Phase 4 CI tasks 5–6 (`085d957`); local smoke hit 1.00 / prec 0.896 / rec 0.75; 182 tests; GH Actions blocked on billing |
+| 2026-06-19 | CI green on GitHub (`27804469869`); faithfulness tuning `dd40b86` (`055058`); README/HTML refresh |
 
 ---
 
@@ -515,9 +523,9 @@ python -c "import json; d=json.load(open('logs/evaluation_results.json')); r=d['
 
 | Question | Answer |
 |----------|--------|
-| **How far have we come?** | Full local RAG stack; Tracks A.1–3 and B.1–6 complete; guidebook rel gate **0.700** (`164848`); Phase 4 CI shipped (pytest + retrieval smoke). |
-| **How much is left?** | ~20% to production pilot: **faithfulness recovery (P3)**, then cache/dashboard (tasks 7–8), ACL/GPU (P2). |
-| **Biggest gap?** | Guidebook **faithfulness 0.629** vs 0.90 target; code-query relevancy **0.525** on full guidebook run. |
-| **Next action?** | Faithfulness tuning on worst-case guidebook buckets; keep relevancy ≥ 0.70; run `ci_eval_gate.py` locally until GH billing fixed. |
+| **How far have we come?** | Full local RAG stack; Tracks A.1–3 and B.1–6 complete; guidebook rel gate **0.700** (`164848`); Phase 4 CI **green on GitHub**. |
+| **How much is left?** | ~20% to production pilot: **code/currency retrieval + faith recovery (P3)**, then cache/dashboard (tasks 7–8), ACL/GPU (P2). |
+| **Biggest gap?** | Guidebook faith **0.629** baseline vs **0.90** target; code bucket faith **0.25** on `055058`. |
+| **Next action?** | Retrieval tuning for `currency_tool_example` / `tools_real_world`; re-eval guidebook after retrieval fix; keep rel ≥ 0.70. |
 
 For setup and tuning, see [README.md](README.md). For why each decision was made, see [README2.md](README2.md).

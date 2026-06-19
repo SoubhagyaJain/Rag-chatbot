@@ -1165,7 +1165,7 @@
         <h3 style="margin-top:2rem;">Guidebook / Track A (35-case + enumeration subset)</h3>
         <p>Dual-corpus index: 308 chunks. Eval scoped with <code>--corpus guidebook</code> and <code>source_file</code> post-filter.</p>
         <div class="target-line" style="margin-top:1rem;">
-          <strong>Guidebook gate:</strong> passed on run <code>164848</code> (rel 0.700, hit 0.771). Enumeration subset <code>160052</code> (rel 0.84). <strong>Phase 4 CI</strong> tasks 5–6 shipped (<code>rag-ci.yml</code> + <code>ci_eval_gate.py</code>). Local smoke PASS (hit 1.00 / prec 0.896 / rec 0.75). GH Actions blocked on billing — run <code>ci_eval_gate.py</code> locally. <strong>Next:</strong> faithfulness tuning (0.629 → 0.90).
+          <strong>Guidebook gate:</strong> passed on run <code>164848</code> (rel 0.700, faith 0.629). Faithfulness prompt tuning <code>055058</code> (<code>dd40b86</code>): faith 0.543, rel 0.666 — no aggregate improvement. <strong>Phase 4 CI green on GitHub</strong> (run <a href="https://github.com/SoubhagyaJain/Rag-chatbot/actions/runs/27804469869">27804469869</a>; hit 1.00 / prec 0.896 / rec 0.667). <strong>Next:</strong> code/currency retrieval fixes (<code>currency_tool_example</code>, <code>tools_real_world</code>).
         </div>
         <p class="scroll-hint">← Swipe table to see all columns →</p>
         <div class="table-wrap">
@@ -1185,7 +1185,8 @@
               <tr><td>132316</td><td>Baseline 35-case guidebook</td><td>0.743</td><td>0.564</td><td>0.757</td><td>0.571</td><td>enum rel 0.36</td></tr>
               <tr><td>152255</td><td>Post code-validation + corpus scope</td><td>0.657</td><td>0.564</td><td>0.629</td><td>0.629</td><td>code pass 100%</td></tr>
               <tr><td>160052</td><td>Enumeration subset (5 cases)</td><td class="high-score">1.000</td><td class="high-score">1.000</td><td>0.500</td><td class="high-score">0.840</td><td>enum gate passed</td></tr>
-              <tr class="highlight-row"><td>164848</td><td><strong>Full guidebook post-enumeration (35 cases)</strong></td><td>0.771</td><td>0.594</td><td>0.629</td><td class="high-score">0.700</td><td>guidebook gate passed</td></tr>
+              <tr class="highlight-row"><td>164848</td><td><strong>Full guidebook post-enumeration (35 cases)</strong></td><td>0.771</td><td>0.594</td><td>0.629</td><td class="high-score">0.700</td><td>relevancy gate passed</td></tr>
+              <tr><td>055058</td><td>Faithfulness prompt tuning (<code>dd40b86</code>)</td><td>0.800</td><td>0.625</td><td>0.543</td><td>0.666</td><td>code faith 0.25; manager_agent 1.0</td></tr>
             </tbody>
           </table>
         </div>
@@ -2109,8 +2110,9 @@
               <tr><td>Code validation pass rate</td><td class="high-score">100%</td><td>Weak subset <code>143246</code></td></tr>
               <tr><td>Hybrid BM25</td><td class="high-score">Done</td><td>RRF fusion default on</td></tr>
               <tr><td>Corpus-scoped retrieval</td><td class="high-score">Done</td><td>src/retrieval_scope.py</td></tr>
-              <tr><td>Phase 4 CI (pytest + eval smoke)</td><td class="high-score">Done</td><td><code>rag-ci.yml</code>; local smoke hit 1.00 / prec 0.896 / rec 0.75; GH billing blocker</td></tr>
-              <tr><td>Guidebook faithfulness ≥ 0.90</td><td class="low-score">0.629</td><td><strong>Next priority</strong> — run <code>164848</code> bucket analysis</td></tr>
+              <tr><td>Phase 4 CI (pytest + eval smoke)</td><td class="high-score">Done</td><td><code>rag-ci.yml</code> green on GH run <code>27804469869</code></td></tr>
+              <tr><td>Faithfulness prompt tuning (<code>dd40b86</code>)</td><td class="low-score">0.543</td><td>Run <code>055058</code> — regression vs baseline 0.629</td></tr>
+              <tr><td>Guidebook faithfulness ≥ 0.90</td><td class="low-score">0.629</td><td><strong>Next:</strong> code/currency retrieval + faith recovery</td></tr>
               <tr><td>Semantic query cache (task 7)</td><td>Deferred</td><td>Phase 4 remainder</td></tr>
               <tr><td>Timing dashboard (task 8)</td><td>Deferred</td><td>Phase 4 remainder</td></tr>
               <tr><td>Per-user ACL filters</td><td>Planned</td><td>Track A Phase 5</td></tr>
