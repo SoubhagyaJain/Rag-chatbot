@@ -222,10 +222,10 @@ Set `AUTO_INDEX_ON_START=true` in `.env.docker` to index automatically when Chro
 
 ### Install pre-built Docker image (Docker Hub) 
 
-Pre-built image: `soubhagyajain/rag-chatbot`
+Pre-built image: `soubhagya007/rag-chatbot`
 
 ```bash
-docker pull soubhagyajain/rag-chatbot:latest
+docker pull soubhagya007/rag-chatbot:latest
 cp .env.docker.example .env.docker
 docker compose -f docker-compose.dockerhub.yml up -d
 ```
@@ -236,11 +236,11 @@ Images are published automatically on pushes to `main` and version tags (`v*`) v
 
 ```bash
 docker login
-docker build -t soubhagyajain/rag-chatbot:latest .
-docker push soubhagyajain/rag-chatbot:latest
+docker build -t soubhagya007/rag-chatbot:latest .
+docker push soubhagya007/rag-chatbot:latest
 ```
 
-**CI setup (Docker Hub only):** add repo secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (Docker Hub → Account Settings → Security → Access Tokens).
+**CI setup (Docker Hub only):** add repo secrets `DOCKERHUB_USERNAME` (`soubhagya007`) and `DOCKERHUB_TOKEN` (Docker Hub → Account Settings → Security → Access Tokens, Read & Write).
 
 ### Install from PyPI
 

@@ -1,6 +1,6 @@
 services:
   app:
-    image: soubhagyajain/rag-chatbot:latest
+    image: soubhagya007/rag-chatbot:latest
     ports:
       - "8501:8501"
     env_file:

@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 env:
-  IMAGE_NAME: soubhagyajain/rag-chatbot
+  IMAGE_NAME: soubhagya007/rag-chatbot
 
 jobs:
   build-and-push:
@@ -20,6 +20,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Verify Docker Hub secrets
+        run: |
+          if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ] || [ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
+            echo "::error::Missing DOCKERHUB_USERNAME or DOCKERHUB_TOKEN repository secrets."
+            echo "Add them at: https://github.com/${{ github.repository }}/settings/secrets/actions"
+            echo "DOCKERHUB_USERNAME should be your Docker Hub ID (e.g. soubhagya007)."
+            echo "DOCKERHUB_TOKEN is a Docker Hub access token with Read & Write permissions."
+            exit 1
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
