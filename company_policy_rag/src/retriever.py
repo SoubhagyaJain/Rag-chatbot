@@ -552,6 +552,10 @@ def build_query_engine(
 
 def get_retrieval_config_summary() -> dict[str, Any]:
     """Snapshot of retrieval settings for eval logs and debugging."""
+    try:
+        bm25_corpus_size = get_bm25_corpus_size()
+    except ImportError:
+        bm25_corpus_size = None
     return {
         "retrieval_candidate_k": settings.retrieval_candidate_k,
         "reranker_top_n": settings.reranker_top_n,
@@ -563,7 +567,7 @@ def get_retrieval_config_summary() -> dict[str, Any]:
         "enable_hybrid_bm25": settings.enable_hybrid_bm25,
         "bm25_top_k": settings.bm25_top_k,
         "hybrid_rrf_k": settings.hybrid_rrf_k,
-        "bm25_corpus_size": get_bm25_corpus_size(),
+        "bm25_corpus_size": bm25_corpus_size,
         "enable_parent_document_retrieval": settings.enable_parent_document_retrieval,
         "enable_corpus_scoped_retrieval": settings.enable_corpus_scoped_retrieval,
         "enable_code_retrieval_boost": settings.enable_code_retrieval_boost,
