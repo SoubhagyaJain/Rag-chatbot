@@ -1,0 +1,90 @@
+/* Company Policy RAG — Streamlit theme overrides */
+
+[data-testid="stChatMessage"] {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.welcome-hero {
+  background: linear-gradient(135deg, rgba(13, 148, 136, 0.08) 0%, rgba(255, 255, 255, 0.6) 100%);
+  border: 1px solid rgba(13, 148, 136, 0.2);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.welcome-hero h3 {
+  margin: 0 0 0.35rem 0;
+  color: #0f172a;
+  font-size: 1.1rem;
+}
+
+.welcome-hero p {
+  margin: 0;
+  color: #475569;
+  font-size: 0.92rem;
+}
+
+.source-header {
+  font-size: 0.85rem;
+  color: #5f6368;
+  margin: 0.75rem 0 0.35rem 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e8eaed;
+}
+
+.source-meta {
+  font-size: 0.8rem;
+  color: #80868b;
+  margin-bottom: 0.25rem;
+}
+
+div[data-testid="stExpander"] details {
+  border-left: 3px solid #0d9488;
+  padding-left: 0.25rem;
+}
+
+div[data-testid="stExpander"] details summary p {
+  font-weight: 500;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(13, 148, 136, 0.12);
+  color: #0d9488;
+  border: 1px solid rgba(13, 148, 136, 0.25);
+}
+
+.status-pill.strict {
+  background: #fce8e6;
+  color: #c5221f;
+  border-color: #f5c6c2;
+}
+
+.trust-panel {
+  font-size: 0.82rem;
+  color: #64748b;
+  margin-top: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.suggested-prompt-btn {
+  margin-bottom: 0.35rem;
+}
+
+@media (max-width: 768px) {
+  .welcome-hero {
+    padding: 1rem;
+  }
+
+  [data-testid="column"] {
+    min-width: 0 !important;
+  }
+}

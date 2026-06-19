@@ -33,7 +33,7 @@ from src.config import settings
 from src.language import append_language_hint
 from src.indexing import configure_llama_index, get_or_create_index
 from src.memory import create_session_memory, trim_memory_to_window
-from src.prompts import get_agent_system_prompt
+from src.prompts import LOW_CONFIDENCE_MESSAGE, get_agent_system_prompt, resolve_grounding_mode
 from src.retriever import build_query_engine
 from src.utils import logger
 
@@ -44,6 +44,9 @@ class AgentTurnResult:
 
     answer: str
     citations: list[dict[str, Any]] = field(default_factory=list)
+    timing: dict[str, float] | None = None
+    low_confidence: bool = False
+    grounding_mode: str = "balanced"
 
 
 def configure_llm() -> Ollama:
@@ -57,14 +60,18 @@ def configure_llm() -> Ollama:
     )
 
 
-def build_policy_search_tool(index: VectorStoreIndex | None = None) -> QueryEngineTool:
+def build_policy_search_tool(
+    index: VectorStoreIndex | None = None,
+    *,
+    scope_filters: dict[str, Any] | None = None,
+) -> QueryEngineTool:
     """
     Wrap the vector query engine as a named tool for ReAct reasoning.
 
     Tool description quality directly affects agent routing accuracy — be explicit
     about when to use this tool vs. answering directly.
     """
-    query_engine = build_query_engine(index)
+    query_engine = build_query_engine(index, filters=scope_filters)
     return QueryEngineTool(
         query_engine=query_engine,
         metadata=ToolMetadata(
@@ -92,6 +99,8 @@ def extract_agent_response(result: AgentOutput) -> str:
 def create_agent(
     index: VectorStoreIndex | None = None,
     memory: ChatMemoryBuffer | None = None,
+    *,
+    scope_filters: dict[str, Any] | None = None,
 ) -> ReActAgent:
     """
     Build a ReAct agent with policy_search and optional session memory.
@@ -105,7 +114,7 @@ def create_agent(
     Settings.llm = configure_llm()
 
     idx = index or get_or_create_index()
-    tools = [build_policy_search_tool(idx)]
+    tools = [build_policy_search_tool(idx, scope_filters=scope_filters)]
 
     session_memory = memory
     if session_memory is None and settings.enable_conversation_memory:
@@ -161,7 +170,12 @@ async def chat_with_memory(
     if settings.enable_conversation_memory and memory is not None:
         trim_memory_to_window(memory)
 
-    return AgentTurnResult(answer=answer, citations=citations)
+    return AgentTurnResult(
+        answer=answer,
+        citations=citations,
+        low_confidence=LOW_CONFIDENCE_MESSAGE in answer,
+        grounding_mode=resolve_grounding_mode(),
+    )
 
 
 def run_query(

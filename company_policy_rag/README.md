@@ -19,7 +19,7 @@ For **interview prep** (60s pitch, architecture diagrams, 49-question bank), see
 | Retrieval + reranker | **Stable** | Over-retrieve → rerank → score filter; eval-validated |
 | Faithfulness grounding | **Stable** | Strict / balanced modes + optional guard |
 | Citation pipeline | **Stable** | Generation-linked sources + mandatory `[Source N]` tags |
-| Streamlit UI | **Stable** | Primary internal tool; chat, sidebar, expandable citations |
+| Streamlit UI | **Stable** | Multipage app: Chat, Documents, System Health; trust panel + corpus scope |
 | Docker deployment | **Stable** | Streamlit container + host Ollama via `host.docker.internal` |
 | Evaluation framework | **Stable** | Golden set, trend logging to `logs/evaluation_results.json` |
 | Hybrid BM25 retrieval | **Stable** | Dense + BM25 RRF fusion (on by default) |
@@ -190,7 +190,15 @@ streamlit run app/streamlit_app.py
 
 Open [http://localhost:8501](http://localhost:8501).
 
-Upload legal PDFs from the **sidebar** or **Manage legal documents** panel on the main page — files are saved to `data/legal/` and indexed automatically.
+**Pages:**
+
+| Page | Audience | Purpose |
+|------|----------|---------|
+| **Chat** | Employees | Policy Q&A, suggested questions, citations, trust & latency panel |
+| **Documents** | Admin | Legal PDF upload/remove, handbook bulk indexing |
+| **System Health** | Admin | Chroma probe, Ollama models, retrieval config, latest eval snapshot |
+
+Upload legal PDFs from **Documents** — files are saved to `data/legal/` and indexed automatically. Use the sidebar on **Chat** to filter corpus scope (all / handbook / guidebook).
 
 ### Docker (Streamlit + host Ollama)
 
@@ -653,7 +661,9 @@ company_policy_rag/
 │   ├── cli.py                 # PyPI CLI entry points
 │   └── utils.py               # Section detection, logging helpers
 ├── app/
-│   ├── streamlit_app.py       # Primary UI (chat, sidebar, citations, upload)
+│   ├── streamlit_app.py       # Multipage entry (st.navigation)
+│   ├── pages/                 # Chat, Documents, System Health
+│   ├── ui/                    # Shared theme, session, sidebar, components
 │   └── chat_app.py            # Chainlit (legacy)
 ├── docker/
 │   └── entrypoint.sh          # Wait for Ollama, optional auto-index, Streamlit
