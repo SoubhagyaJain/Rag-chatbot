@@ -6,7 +6,8 @@ Built for teams that need **grounded answers with verifiable `[Source N]` citati
 
 For the full engineering journey (metric regressions, fixes, lessons), see [README2.md](README2.md).  
 For **progress status, validation gaps, and remaining work**, see [README3.md](README3.md).  
-For an **interactive visual plan** (timeline, metrics, architecture diagrams), see [project-plans.html](../project-plans.html).
+For an **interactive visual plan** (timeline, metrics, architecture diagrams), see [project-plans.html](../project-plans.html).  
+For **interview prep** (60s pitch, architecture diagrams, 49-question bank), see [interview-notes.html](../interview-notes.html).
 
 ---
 
