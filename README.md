@@ -108,6 +108,7 @@ Targets: faith ≥ 0.90, relevancy ≥ 0.75. Guidebook faithfulness remains the 
 
 | Doc | Purpose |
 |-----|---------|
+| [project-plans.html](project-plans.html) | Interactive engineering plans — timeline, metrics, architecture diagrams |
 | [company_policy_rag/README.md](company_policy_rag/README.md) | Setup, architecture, config, eval, troubleshooting |
 | [company_policy_rag/README2.md](company_policy_rag/README2.md) | Engineering journey — metric regressions, fixes, lessons |
 | [company_policy_rag/README3.md](company_policy_rag/README3.md) | Living status report — completion %, backlog, risks |

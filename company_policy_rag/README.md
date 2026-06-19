@@ -5,7 +5,8 @@ Production-minded **Retrieval-Augmented Generation** for company policies and le
 Built for teams that need **grounded answers with verifiable `[Source N]` citations** — not demo RAG that hallucinates confidently.
 
 For the full engineering journey (metric regressions, fixes, lessons), see [README2.md](README2.md).  
-For **progress status, validation gaps, and remaining work**, see [README3.md](README3.md).
+For **progress status, validation gaps, and remaining work**, see [README3.md](README3.md).  
+For an **interactive visual plan** (timeline, metrics, architecture diagrams), see [project-plans.html](../project-plans.html).
 
 ---
 
