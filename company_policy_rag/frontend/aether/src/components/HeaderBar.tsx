@@ -1,12 +1,15 @@
-import { ChevronDown, Download, Settings } from "lucide-react";
-import { useState } from "react";
+import { Download, Settings } from "lucide-react";
 import type { ModelInfo } from "../api/client";
+import { ModelSelector } from "./ModelSelector";
 
 interface Props {
   activeLabel: string;
   models: ModelInfo[];
   activeId: string | null;
+  connected: boolean;
+  modelsLoading: boolean;
   onSelectModel: (id: string) => void;
+  onRefreshModels: () => void;
   onConfig: () => void;
   onExport: () => void;
 }
@@ -15,41 +18,24 @@ export function HeaderBar({
   activeLabel,
   models,
   activeId,
+  connected,
+  modelsLoading,
   onSelectModel,
+  onRefreshModels,
   onConfig,
   onExport,
 }: Props) {
-  const [open, setOpen] = useState(false);
-
   return (
     <header className="flex items-center justify-between px-8 py-4 border-b border-violet-200/40 bg-canvas/80 backdrop-blur-sm">
-      <div className="relative">
-        <button
-          onClick={() => setOpen(!open)}
-          className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/60 hover:bg-white border border-violet-200/50 text-sm font-medium text-sidebar transition-all hover:shadow-[0_4px_24px_rgba(124,58,237,0.08)]"
-        >
-          {activeLabel}
-          <ChevronDown className="w-4 h-4 text-sidebar/50" />
-        </button>
-        {open && (
-          <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-2xl shadow-[0_8px_32px_rgba(28,24,48,0.12)] border border-violet-100 py-2 z-30">
-            {models.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => {
-                  onSelectModel(m.id);
-                  setOpen(false);
-                }}
-                className={`w-full text-left px-4 py-2 text-sm hover:bg-violet-50 ${
-                  m.id === activeId ? "text-primary font-medium" : "text-sidebar"
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      <ModelSelector
+        activeLabel={activeLabel}
+        models={models}
+        activeId={activeId}
+        connected={connected}
+        loading={modelsLoading}
+        onSelect={onSelectModel}
+        onRefresh={onRefreshModels}
+      />
       <div className="flex items-center gap-2">
         <button
           onClick={onConfig}

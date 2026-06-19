@@ -42,6 +42,7 @@ from src.building_block_pipeline import (
 from src.query_processing import is_comprehensive_list_query, is_guidebook_edge_case_query
 from src.retriever import build_retriever
 from src.timing import get_current_timing, record_stage
+from src.thinking_extract import set_thinking_this_turn, split_llm_response
 from src.utils import logger, timer
 
 # Substrings that signal a trailing abstention block (full or partial phrasing).
@@ -107,6 +108,11 @@ class GroundedCompactAndRefine(CompactAndRefine):
             text_chunks=text_chunks,
             **response_kwargs,
         )
+        model_id = getattr(self._llm, "model", None) or settings.llm_model
+        split = split_llm_response(response_str, model_id=str(model_id))
+        if split.thinking:
+            set_thinking_this_turn(split.thinking)
+        response_str = split.answer
         response_str = normalize_balanced_answer(
             response_str, query=query.query_str
         )
@@ -135,6 +141,11 @@ class GroundedCompactAndRefine(CompactAndRefine):
             text_chunks=text_chunks,
             **response_kwargs,
         )
+        model_id = getattr(self._llm, "model", None) or settings.llm_model
+        split = split_llm_response(response_str, model_id=str(model_id))
+        if split.thinking:
+            set_thinking_this_turn(split.thinking)
+        response_str = split.answer
         response_str = normalize_balanced_answer(
             response_str, query=query.query_str
         )

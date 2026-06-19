@@ -14,6 +14,7 @@ LlamaIndex >= 0.14: ReActAgent is workflow-based — use constructor + run(), no
 from __future__ import annotations
 
 import asyncio
+import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -35,6 +36,8 @@ from src.indexing import configure_llama_index, get_or_create_index
 from src.memory import create_session_memory, trim_memory_to_window
 from src.prompts import LOW_CONFIDENCE_MESSAGE, get_agent_system_prompt, resolve_grounding_mode
 from src.retriever import build_query_engine
+from src.retrieval_trace import build_retrieval_trace
+from src.thinking_extract import begin_thinking_turn, get_thinking_this_turn
 from src.utils import logger
 
 
@@ -47,6 +50,9 @@ class AgentTurnResult:
     timing: dict[str, float] | None = None
     low_confidence: bool = False
     grounding_mode: str = "balanced"
+    thinking: str | None = None
+    retrieval_trace: dict[str, Any] | None = None
+    message_id: str | None = None
 
 
 def configure_llm() -> Ollama:
@@ -150,6 +156,7 @@ async def chat_with_memory(
     Citations are selected from query-engine source nodes cited in the answer.
     """
     begin_citation_turn()
+    begin_thinking_turn()
     handler = agent.run(
         user_msg=append_language_hint(user_message),
         memory=memory,
@@ -170,11 +177,15 @@ async def chat_with_memory(
     if settings.enable_conversation_memory and memory is not None:
         trim_memory_to_window(memory)
 
+    generation_nodes = get_generation_nodes_this_turn()
     return AgentTurnResult(
         answer=answer,
         citations=citations,
         low_confidence=LOW_CONFIDENCE_MESSAGE in answer,
         grounding_mode=resolve_grounding_mode(),
+        thinking=get_thinking_this_turn(),
+        retrieval_trace=build_retrieval_trace(generation_nodes),
+        message_id=str(uuid.uuid4())[:12],
     )
 
 

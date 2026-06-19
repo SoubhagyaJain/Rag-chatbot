@@ -74,6 +74,9 @@ def test_chat_endpoint(mock_chat: MagicMock, client: TestClient) -> None:
         timing={"e2e_ms": 1200},
         low_confidence=False,
         grounding_mode="balanced",
+        thinking="Let me check the handbook.",
+        retrieval_trace={"chunk_count": 3, "chunks": []},
+        message_id="msg-abc",
     )
     resp = client.post(
         "/api/chat",
@@ -83,3 +86,40 @@ def test_chat_endpoint(mock_chat: MagicMock, client: TestClient) -> None:
     data = resp.json()
     assert "Professional appearance" in data["answer"]
     assert len(data["citations"]) == 1
+    assert data["thinking"] == "Let me check the handbook."
+    assert data["message_id"] == "msg-abc"
+    assert data["retrieval_trace"]["chunk_count"] == 3
+
+
+@patch("src.api.routes.feedback.record_feedback")
+def test_feedback_endpoint(mock_record: MagicMock, client: TestClient) -> None:
+    mock_record.return_value = {"id": "fb1", "rating": 1}
+    resp = client.post(
+        "/api/feedback",
+        json={
+            "rating": 1,
+            "question": "Dress code?",
+            "answer": "Business casual.",
+            "model": "qwen2.5:7b",
+            "corpus_scope": "policy",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["ok"] is True
+
+
+@patch("src.api.routes.chat.run_chat_stream")
+def test_chat_stream_endpoint(mock_stream: MagicMock, client: TestClient) -> None:
+    mock_stream.return_value = iter(
+        [
+            'event: token\ndata: Hello\n\n',
+            'event: done\ndata: {"answer":"Hello","citations":[],"low_confidence":false,"grounding_mode":"balanced"}\n\n',
+        ]
+    )
+    resp = client.post(
+        "/api/chat/stream",
+        json={"message": "Hi", "corpus_scope": "all"},
+    )
+    assert resp.status_code == 200
+    assert "text/event-stream" in resp.headers.get("content-type", "")
+    assert "event: token" in resp.text

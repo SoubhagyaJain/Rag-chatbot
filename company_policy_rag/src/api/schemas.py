@@ -34,11 +34,28 @@ class ChatResponse(BaseModel):
     timing: dict[str, Any] | None = None
     low_confidence: bool = False
     grounding_mode: str = "balanced"
+    thinking: str | None = None
+    retrieval_trace: dict[str, Any] | None = None
+    message_id: str | None = None
 
 
 class ModelInfo(BaseModel):
     id: str
     label: str
+    family: str | None = None
+    parameter_size: str | None = None
+    quantization: str | None = None
+    badges: list[str] = Field(default_factory=list)
+
+
+class FeedbackRequest(BaseModel):
+    rating: Literal[1, -1]
+    question: str
+    answer: str
+    model: str = ""
+    corpus_scope: CorpusScope = "all"
+    message_id: str | None = None
+    comment: str | None = None
 
 
 class ModelsResponse(BaseModel):

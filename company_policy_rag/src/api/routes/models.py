@@ -17,7 +17,7 @@ def get_models() -> ModelsResponse:
         connected=data["connected"],
         error=data.get("error"),
         active_model=data["active_model"],
-        models=[ModelInfo(**m) for m in data["models"]],
+        models=[ModelInfo.model_validate(m) for m in data["models"]],
     )
 
 

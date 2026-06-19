@@ -1,15 +1,37 @@
 export type CorpusScope = "all" | "policy" | "guidebook";
 export type GroundingMode = "balanced" | "strict";
 
+export interface RetrievalTrace {
+  chunk_count?: number;
+  chunks?: Array<{
+    index: number;
+    section_path?: string;
+    page_number?: number;
+    score?: number;
+    excerpt_preview?: string;
+  }>;
+  stages?: Record<string, number>;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   citations?: Array<Record<string, unknown>>;
+  thinking?: string;
+  retrieval_trace?: RetrievalTrace | null;
+  timing?: Record<string, number> | null;
+  message_id?: string;
+  low_confidence?: boolean;
+  isStreaming?: boolean;
 }
 
 export interface ModelInfo {
   id: string;
   label: string;
+  family?: string;
+  parameter_size?: string;
+  quantization?: string;
+  badges?: string[];
 }
 
 export interface ModelsResponse {
@@ -27,6 +49,35 @@ export interface HealthResponse {
   embed_model: string;
 }
 
+export interface ChatResponse {
+  answer: string;
+  citations: Array<Record<string, unknown>>;
+  timing?: Record<string, number>;
+  low_confidence: boolean;
+  thinking?: string;
+  retrieval_trace?: RetrievalTrace;
+  message_id?: string;
+}
+
+export interface StreamDonePayload {
+  answer: string;
+  thinking?: string;
+  citations: Array<Record<string, unknown>>;
+  timing?: Record<string, number>;
+  retrieval_trace?: RetrievalTrace;
+  message_id?: string;
+  low_confidence: boolean;
+  grounding_mode: string;
+}
+
+export interface StreamHandlers {
+  onRetrievalDone?: (trace: RetrievalTrace) => void;
+  onThinking?: (thinking: string) => void;
+  onToken?: (token: string) => void;
+  onDone?: (payload: StreamDonePayload) => void;
+  onError?: (message: string) => void;
+}
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
     headers: { "Content-Type": "application/json", ...init?.headers },
@@ -37,6 +88,24 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error((err as { detail?: string }).detail || res.statusText);
   }
   return res.json() as Promise<T>;
+}
+
+function parseSseChunk(buffer: string): { events: Array<{ event: string; data: string }>; rest: string } {
+  const events: Array<{ event: string; data: string }> = [];
+  const parts = buffer.split("\n\n");
+  const rest = parts.pop() ?? "";
+
+  for (const part of parts) {
+    if (!part.trim()) continue;
+    let event = "message";
+    const dataLines: string[] = [];
+    for (const line of part.split("\n")) {
+      if (line.startsWith("event:")) event = line.slice(6).trim();
+      else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+    }
+    if (dataLines.length) events.push({ event, data: dataLines.join("\n") });
+  }
+  return { events, rest };
 }
 
 export function fetchModels() {
@@ -62,12 +131,7 @@ export function sendChat(
     grounding_mode?: GroundingMode;
   } = {},
 ) {
-  return api<{
-    answer: string;
-    citations: Array<Record<string, unknown>>;
-    timing?: Record<string, number>;
-    low_confidence: boolean;
-  }>("/chat", {
+  return api<ChatResponse>("/chat", {
     method: "POST",
     body: JSON.stringify({
       message,
@@ -76,6 +140,91 @@ export function sendChat(
       llm_model: opts.llm_model,
       grounding_mode: opts.grounding_mode,
     }),
+  });
+}
+
+export async function sendChatStream(
+  message: string,
+  opts: {
+    corpus_scope?: CorpusScope;
+    llm_model?: string | null;
+    grounding_mode?: GroundingMode;
+  },
+  handlers: StreamHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  const res = await fetch("/api/chat/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      message,
+      corpus_scope: opts.corpus_scope ?? "all",
+      chat_mode: "direct",
+      llm_model: opts.llm_model,
+      grounding_mode: opts.grounding_mode,
+    }),
+    signal,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail || res.statusText);
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("Streaming not supported");
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const { events, rest } = parseSseChunk(buffer);
+    buffer = rest;
+
+    for (const { event, data } of events) {
+      if (event === "retrieval_done") {
+        try {
+          handlers.onRetrievalDone?.(JSON.parse(data) as RetrievalTrace);
+        } catch {
+          /* ignore malformed */
+        }
+      } else if (event === "thinking") {
+        handlers.onThinking?.(data);
+      } else if (event === "token") {
+        handlers.onToken?.(data);
+      } else if (event === "done") {
+        try {
+          handlers.onDone?.(JSON.parse(data) as StreamDonePayload);
+        } catch {
+          handlers.onError?.("Invalid stream completion payload");
+        }
+      } else if (event === "error") {
+        try {
+          const parsed = JSON.parse(data) as { message?: string };
+          handlers.onError?.(parsed.message || "Stream error");
+        } catch {
+          handlers.onError?.(data || "Stream error");
+        }
+      }
+    }
+  }
+}
+
+export function submitFeedback(payload: {
+  rating: 1 | -1;
+  question: string;
+  answer: string;
+  model: string;
+  corpus_scope: string;
+  message_id?: string;
+  comment?: string;
+}) {
+  return api<{ ok: boolean; id: string }>("/feedback", {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 

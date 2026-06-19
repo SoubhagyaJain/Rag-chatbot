@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from src.api.routes import chat, eval, health, models
+from src.api.routes import chat, eval, feedback, health, models
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PREVIEW_HTML = PROJECT_ROOT / "frontend" / "preview" / "aether.html"
@@ -41,6 +41,7 @@ def create_app() -> FastAPI:
     app.include_router(models.router, prefix="/api", tags=["models"])
     app.include_router(health.router, prefix="/api", tags=["health"])
     app.include_router(eval.router, prefix="/api", tags=["eval"])
+    app.include_router(feedback.router, prefix="/api", tags=["feedback"])
 
     if PREVIEW_DIR.is_dir():
         app.mount("/preview", StaticFiles(directory=str(PREVIEW_DIR)), name="preview")

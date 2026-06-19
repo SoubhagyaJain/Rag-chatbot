@@ -29,10 +29,13 @@ from src.indexing import (
 )
 from src.language import append_language_hint
 from src.memory import create_session_memory
-from src.ollama_client import filter_chat_models, format_model_label, probe_ollama_tags
+from src.ollama_client import list_enriched_models, probe_ollama_tags
+from src.retrieval_trace import build_retrieval_trace
+from src.thinking_extract import begin_thinking_turn, get_thinking_this_turn
 from src.prompts import LOW_CONFIDENCE_MESSAGE, resolve_grounding_mode
 from src.retrieval_scope import corpus_retrieval_filters, resolve_query_filters
-from src.retriever import build_query_engine, build_retriever, get_retrieval_config_summary
+from src.retriever import build_query_engine, get_retrieval_config_summary
+from src.streaming_generation import prepare_stream_turn, stream_chat_turn
 from src.timing import begin_query_timing, clear_timing, get_current_timing, record_stage
 from src.utils import logger
 
@@ -91,16 +94,12 @@ def apply_llm_model(model: str) -> None:
 
 def list_available_models() -> dict[str, Any]:
     ok, names, err = probe_ollama_tags()
-    chat_models = filter_chat_models(names)
-    if settings.llm_model not in chat_models:
-        chat_models = [settings.llm_model] + chat_models
+    models = list_enriched_models(names if ok else [settings.llm_model])
     return {
         "connected": ok,
         "error": err,
         "active_model": settings.llm_model,
-        "models": [
-            {"id": m, "label": format_model_label(m)} for m in chat_models
-        ],
+        "models": models,
     }
 
 
@@ -206,33 +205,60 @@ def _get_query_engine(
     return engine
 
 
+def _build_turn_result(
+    user_message: str,
+    answer: str,
+    *,
+    t0: float,
+) -> AgentTurnResult:
+    generation_nodes = get_generation_nodes_this_turn()
+    citations: list[dict[str, Any]] = []
+    if settings.show_citations:
+        citations = select_citations_for_answer(
+            answer,
+            generation_nodes,
+            user_query=user_message,
+        )
+    record_stage("e2e", (time.perf_counter() - t0) * 1000)
+    timing = get_current_timing()
+    return AgentTurnResult(
+        answer=answer,
+        citations=citations,
+        timing=timing.as_dict() if timing else None,
+        low_confidence=LOW_CONFIDENCE_MESSAGE in answer,
+        grounding_mode=resolve_grounding_mode(),
+        thinking=get_thinking_this_turn(),
+        retrieval_trace=build_retrieval_trace(
+            generation_nodes,
+            timing.as_dict() if timing else None,
+        ),
+        message_id=str(uuid.uuid4())[:12],
+    )
+
+
 def _run_direct_turn(user_message: str, corpus_scope: CorpusScope) -> AgentTurnResult:
     query_engine = _get_query_engine(user_message, corpus_scope)
     begin_query_timing()
     t0 = time.perf_counter()
     try:
         begin_citation_turn()
+        begin_thinking_turn()
         response = query_engine.query(append_language_hint(user_message))
         answer = _extract_query_answer(response)
-        citations: list[dict[str, Any]] = []
-        if settings.show_citations:
-            generation_nodes = get_generation_nodes_this_turn()
-            citations = select_citations_for_answer(
-                answer,
-                generation_nodes,
-                user_query=user_message,
-            )
-        record_stage("e2e", (time.perf_counter() - t0) * 1000)
-        timing = get_current_timing()
-        return AgentTurnResult(
-            answer=answer,
-            citations=citations,
-            timing=timing.as_dict() if timing else None,
-            low_confidence=LOW_CONFIDENCE_MESSAGE in answer,
-            grounding_mode=resolve_grounding_mode(),
-        )
+        return _build_turn_result(user_message, answer, t0=t0)
     finally:
         clear_timing()
+
+
+def _retrieve_nodes_for_turn(
+    user_message: str,
+    corpus_scope: CorpusScope,
+) -> list:
+    """Use the same retriever as the cached query engine (rewrite + rerank pipeline)."""
+    query_engine = _get_query_engine(user_message, corpus_scope)
+    inner = query_engine._inner
+    retriever = inner.retriever
+    return list(retriever.retrieve(append_language_hint(user_message)))
 
 
 def _run_agent_turn(user_message: str, corpus_scope: CorpusScope) -> AgentTurnResult:
@@ -247,6 +273,8 @@ def _run_agent_turn(user_message: str, corpus_scope: CorpusScope) -> AgentTurnRe
     begin_query_timing()
     t0 = time.perf_counter()
     try:
+        begin_citation_turn()
+        begin_thinking_turn()
         try:
             turn = asyncio.run(chat_with_memory(agent, user_message, memory=memory))
         except RuntimeError:
@@ -259,11 +287,46 @@ def _run_agent_turn(user_message: str, corpus_scope: CorpusScope) -> AgentTurnRe
                 loop.close()
         record_stage("e2e", (time.perf_counter() - t0) * 1000)
         timing = get_current_timing()
-        if timing and turn.timing is None:
+        if timing:
             turn.timing = timing.as_dict()
+            if turn.retrieval_trace is not None:
+                turn.retrieval_trace = build_retrieval_trace(
+                    get_generation_nodes_this_turn(),
+                    timing.as_dict(),
+                )
         return turn
     finally:
         clear_timing()
+
+
+def run_chat_stream(
+    message: str,
+    *,
+    corpus_scope: CorpusScope = "all",
+    chat_mode: ChatMode = "direct",
+    llm_model: str | None = None,
+    grounding_mode: GroundingMode | None = None,
+):
+    """Generator of SSE strings for streaming chat."""
+    if chat_mode != "direct":
+        raise RuntimeError("Streaming supports direct mode only.")
+
+    if grounding_mode:
+        apply_grounding_mode(grounding_mode)
+
+    probe = probe_chroma_index()
+    if not probe.get("ready"):
+        raise RuntimeError("Search index is not ready. Index documents before chatting.")
+
+    _ensure_backend(
+        corpus_scope=corpus_scope,
+        chat_mode=chat_mode,
+        llm_model=llm_model,
+    )
+
+    t0, _ = prepare_stream_turn(message)
+    nodes = _retrieve_nodes_for_turn(message, corpus_scope)
+    yield from stream_chat_turn(message, nodes, t0=t0)
 
 
 def run_chat_turn(
@@ -302,6 +365,9 @@ def turn_to_dict(turn: AgentTurnResult) -> dict[str, Any]:
         "timing": turn.timing,
         "low_confidence": turn.low_confidence,
         "grounding_mode": turn.grounding_mode,
+        "thinking": turn.thinking,
+        "retrieval_trace": turn.retrieval_trace,
+        "message_id": turn.message_id,
     }
 
 
@@ -351,6 +417,12 @@ def start_eval_job(*, max_samples: int | None = 5) -> EvalJob:
     )
     thread.start()
     return job
+
+
+def feedback_summary() -> dict[str, Any]:
+    from src.feedback_store import feedback_summary as _summary
+
+    return _summary()
 
 
 def get_eval_job(job_id: str) -> EvalJob | None:

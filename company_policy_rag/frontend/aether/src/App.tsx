@@ -7,6 +7,7 @@ import {
 } from "./api/client";
 import { ChatInput } from "./components/ChatInput";
 import { ChatThread } from "./components/ChatThread";
+import { CitationPanel, type Citation } from "./components/CitationPanel";
 import { ConfigPanel } from "./components/ConfigPanel";
 import { FeatureCards } from "./components/FeatureCards";
 import { HeaderBar } from "./components/HeaderBar";
@@ -27,8 +28,12 @@ export default function App() {
   const [configOpen, setConfigOpen] = useState(false);
   const [healthText, setHealthText] = useState("");
   const [toast, setToast] = useState("");
+  const [citationOpen, setCitationOpen] = useState(false);
+  const [citationList, setCitationList] = useState<Citation[]>([]);
+  const [citationHighlight, setCitationHighlight] = useState<number | undefined>();
 
-  const { models, active, activeLabel, select } = useModels();
+  const { models, active, activeLabel, connected, loading: modelsLoading, select, refresh } =
+    useModels();
   const { messages, loading, send, clear } = useChat(scope, active, grounding);
 
   const showWelcome = messages.length === 0 && !loading;
@@ -46,6 +51,12 @@ export default function App() {
   const notify = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(""), 4000);
+  };
+
+  const openCitations = (citations: Citation[], highlightIndex?: number) => {
+    setCitationList(citations);
+    setCitationHighlight(highlightIndex);
+    setCitationOpen(true);
   };
 
   const quickPolicy = () => {
@@ -88,6 +99,13 @@ export default function App() {
         </div>
       )}
 
+      <CitationPanel
+        open={citationOpen}
+        citations={citationList}
+        highlightIndex={citationHighlight}
+        onClose={() => setCitationOpen(false)}
+      />
+
       <ConfigPanel
         open={configOpen}
         onClose={() => setConfigOpen(false)}
@@ -105,10 +123,13 @@ export default function App() {
           activeLabel={activeLabel}
           models={models}
           activeId={active}
+          connected={connected}
+          modelsLoading={modelsLoading}
           onSelectModel={async (id) => {
             await select(id);
-            notify(`Model switched`);
+            notify("Model switched");
           }}
+          onRefreshModels={refresh}
           onConfig={() => setConfigOpen(true)}
           onExport={exportChat}
         />
@@ -122,7 +143,14 @@ export default function App() {
               onEval={handleEval}
             />
           )}
-          <ChatThread messages={messages} loading={loading} />
+          <ChatThread
+            messages={messages}
+            loading={loading}
+            model={active ?? ""}
+            corpusScope={scope}
+            onCitationClick={openCitations}
+            onToast={notify}
+          />
           {showWelcome && (
             <FeatureCards
               onPolicy={quickPolicy}
