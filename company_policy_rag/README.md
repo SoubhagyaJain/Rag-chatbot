@@ -220,7 +220,7 @@ docker compose down
 
 Set `AUTO_INDEX_ON_START=true` in `.env.docker` to index automatically when Chroma is empty.
 
-### Install pre-built Docker image (Docker Hub)
+### Install pre-built Docker image (Docker Hub) 
 
 Pre-built image: `soubhagyajain/rag-chatbot`
 
@@ -264,7 +264,7 @@ pytest tests/ -v
 
 ### CI / quality gates
 
-GitHub Actions workflow: [`.github/workflows/rag-ci.yml`](../.github/workflows/rag-ci.yml) — `unit-tests` (182 pytest) + `eval-smoke` (retrieval-only gate on 8-case stratified subset).
+GitHub Actions workflow: [`.github/workflows/rag-ci.yml`](../.github/workflows/rag-ci.yml) — `unit-tests` (222 pytest) + `eval-smoke` (retrieval-only gate on 8-case stratified subset).
 
 **Local smoke** (same as CI `eval-smoke` job):
 
@@ -277,7 +277,9 @@ python scripts/ci_eval_gate.py
 
 Dataset: `data/eval/golden_subset_ci_smoke.json`. Floors: `data/eval/ci_smoke_baseline.json` (hit ≥ 0.75, precision ≥ 0.50, recall ≥ 0.55).
 
-**Latest green run:** [#27804469869](https://github.com/SoubhagyaJain/Rag-chatbot/actions/runs/27804469869) — `unit-tests` 182/182 + `eval-smoke` PASS (hit **1.000**, prec **0.896**, rec **0.667**). CI smoke is retrieval-only; faithfulness is not gated in CI today.
+**Latest green run:** [#27804469869](https://github.com/SoubhagyaJain/Rag-chatbot/actions/runs/27804469869) — `unit-tests` 222/222 + `eval-smoke` PASS (hit **1.000**, prec **0.896**, rec **0.667**). CI smoke is retrieval-only; faithfulness is not gated in CI today.
+
+**Local relevancy gates** (require Ollama + `qwen2.5:7b`, not wired to GitHub Actions yet): `ci_building_block_gate.py`, `ci_agent_topic_gate.py`, `ci_tool_code_gate.py`.
 
 ---
 
@@ -571,7 +573,7 @@ company_policy_rag/
 │   └── eval/golden_dataset.json
 ├── storage/chroma/         # Vector store (runtime)
 ├── logs/                   # app.log, evaluation_results.json
-└── tests/                  # 182 tests
+└── tests/                  # 222 tests
 ```
 
 ---

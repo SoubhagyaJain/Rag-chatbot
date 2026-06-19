@@ -7,7 +7,9 @@ from src.query_processing import (
     augment_query_with_guidebook_terms,
     augment_query_with_policy_terms,
     build_multi_retrieval_queries,
+    is_code_or_tool_query,
     is_comprehensive_list_query,
+    is_guidebook_edge_case_query,
 )
 
 
@@ -87,6 +89,34 @@ def test_is_comprehensive_list_query_detects_subagent_roles() -> None:
     assert is_comprehensive_list_query(q) is True
 
 
+def test_is_comprehensive_list_query_detects_guardrails() -> None:
+    q = "What are Guardrails in AI agents and why are they used?"
+    assert is_comprehensive_list_query(q) is True
+
+
+def test_is_comprehensive_list_query_detects_planning_block() -> None:
+    q = "What is the Planning building block in AI agents?"
+    assert is_comprehensive_list_query(q) is True
+
+
+def test_augment_guidebook_guardrails() -> None:
+    q = "What are Guardrails in AI agents and why are they used?"
+    expanded = augment_query_with_guidebook_terms(q)
+    assert "guardrails" in expanded.lower()
+    assert "building block" in expanded.lower()
+
+
+def test_build_multi_retrieval_queries_guardrails() -> None:
+    q = "What are Guardrails in AI agents and why are they used?"
+    queries = build_multi_retrieval_queries(q, max_queries=8)
+    assert any("guardrails" in item.lower() for item in queries)
+
+
+def test_is_guidebook_edge_case_vacation() -> None:
+    q = "How many vacation days do nonprofit employees accrue per the AI Agents guidebook?"
+    assert is_guidebook_edge_case_query(q) is True
+
+
 def test_build_multi_retrieval_queries_extracts_topics() -> None:
     q = (
         "List and explain the 6 building blocks of AI Agents. Pay special attention to "
@@ -110,3 +140,49 @@ def test_build_multi_retrieval_queries_design_patterns() -> None:
     q = "What are the most popular agent design patterns mentioned?"
     queries = build_multi_retrieval_queries(q, max_queries=8)
     assert any("react" in item.lower() for item in queries)
+
+
+def test_augment_guidebook_currency() -> None:
+    q = "Show the currency conversion tool example and explain how it is invoked."
+    expanded = augment_query_with_guidebook_terms(q)
+    assert "convert_currency" in expanded.lower()
+    assert "exchange rate" in expanded.lower()
+
+
+def test_augment_guidebook_code_links() -> None:
+    q = "Where does the guidebook point readers for full code examples?"
+    expanded = augment_query_with_guidebook_terms(q)
+    assert "code is available" in expanded.lower()
+
+
+def test_augment_guidebook_check_this_out() -> None:
+    q = "What code walkthroughs does the guidebook highlight with Check this out?"
+    expanded = augment_query_with_guidebook_terms(q)
+    assert "check this out" in expanded.lower()
+
+
+def test_is_code_or_tool_query_target_cases() -> None:
+    cases = [
+        "Show the currency conversion tool example and explain how it is invoked.",
+        "What real-world capability does the currency tool demonstrate?",
+        "Where does the guidebook point readers for full code examples?",
+        "What code walkthroughs does the guidebook highlight with Check this out?",
+    ]
+    for q in cases:
+        assert is_code_or_tool_query(q) is True, q
+
+
+def test_is_code_or_tool_query_negative() -> None:
+    assert is_code_or_tool_query("What types of memory do agents use?") is False
+
+
+def test_build_multi_retrieval_queries_currency() -> None:
+    q = "Show the currency conversion tool example and explain how it is invoked."
+    queries = build_multi_retrieval_queries(q, max_queries=12)
+    assert any("convert_currency" in item.lower() for item in queries)
+
+
+def test_build_multi_retrieval_queries_code_links() -> None:
+    q = "Where does the guidebook point readers for full code examples?"
+    queries = build_multi_retrieval_queries(q, max_queries=12)
+    assert any("code is available" in item.lower() for item in queries)

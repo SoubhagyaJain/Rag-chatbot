@@ -28,6 +28,17 @@ _CODE_BLOCK_PREFIX = "[CODE BLOCK"
 _CODE_BLOCK_HEADER_RE = re.compile(r"\[CODE BLOCK[^\]]*\]\s*", re.IGNORECASE)
 _SOURCE_TAG_RE = re.compile(r"<source[^>]*>|</source>", re.IGNORECASE)
 _DEF_NAME_RE = re.compile(r"^(?:async\s+)?def\s+(\w+)")
+_ORPHAN_CODE_PREAMBLE_RE = re.compile(
+    r"(?im)^.*\b(?:defined|implemented|shown)\s+as\s*:\s*$"
+)
+_CONTRADICTORY_ABSENCE_RE = re.compile(
+    r"(?i)(?:does not provide|do not contain|cannot find|no (?:complete )?code)",
+)
+
+
+def _escape_format_braces(text: str) -> str:
+    """Escape braces so str.format on prompt templates does not treat code as placeholders."""
+    return text.replace("{", "{{").replace("}", "}}")
 
 
 @dataclass
@@ -172,6 +183,36 @@ def heuristic_code_grounded(answer: str, context: str) -> HeuristicResult:
     )
 
 
+def remove_orphan_code_preambles(answer: str) -> str:
+    """Drop lines like 'the tool is defined as:' when no code block follows."""
+    if not answer.strip():
+        return answer
+
+    lines = answer.splitlines()
+    cleaned: list[str] = []
+    for i, line in enumerate(lines):
+        if _ORPHAN_CODE_PREAMBLE_RE.match(line.strip()):
+            remainder = "\n".join(lines[i + 1 :]).strip()
+            if not remainder or "```" not in remainder:
+                continue
+        cleaned.append(line)
+
+    result = "\n".join(cleaned).strip()
+    return re.sub(r"\n{3,}", "\n\n", result)
+
+
+def _needs_prose_fallback(answer: str) -> bool:
+    """True when stripped answer still looks broken or self-contradictory."""
+    text = answer.strip()
+    if not text:
+        return True
+    if _ORPHAN_CODE_PREAMBLE_RE.search(text):
+        return True
+    has_substance = len(text) >= 80 and "[Source" in text
+    has_denial = bool(_CONTRADICTORY_ABSENCE_RE.search(text))
+    return has_denial and has_substance
+
+
 def strip_unsupported_code(answer: str, failed_lines: list[str]) -> str:
     """Remove fenced blocks with unsupported code; keep surrounding prose."""
     if not answer.strip():
@@ -252,8 +293,8 @@ def validate_code_grounding(
         failed_lines=failed_lines or None,
     )
     prompt = prompt_template.format(
-        context=context[:6000],
-        answer=answer[:2000],
+        context=_escape_format_braces(context[:6000]),
+        answer=_escape_format_braces(answer[:2000]),
     )
     try:
         raw = str(llm.complete(prompt)).strip()
@@ -282,9 +323,9 @@ def self_correct_code_answer(
 ) -> str:
     context = format_nodes_for_prompt(list(nodes))
     prompt = get_code_self_correction_prompt().format(
-        query=query[:500],
-        context=context[:6000],
-        answer=answer[:2000],
+        query=_escape_format_braces(query[:500]),
+        context=_escape_format_braces(context[:6000]),
+        answer=_escape_format_braces(answer[:2000]),
     )
     try:
         corrected = str(llm.complete(prompt)).strip()
@@ -300,18 +341,31 @@ def _apply_fail_mode(
     corrected: str,
     nodes: Sequence[NodeWithScore],
     trace: CodeValidationTrace,
+    llm: LLM | None = None,
 ) -> tuple[str, CodeValidationTrace]:
     if settings.code_validation_fail_mode == "strip_code":
         stripped = strip_unsupported_code(corrected, trace.failed_lines)
+        stripped = remove_orphan_code_preambles(stripped)
+
         if stripped.strip() and stripped != LOW_CONFIDENCE_MESSAGE:
-            trace.passed = True
-            trace.fallback_applied = False
-            trace.validation_method = "strip_code"
-            trace.explanation = (
-                f"{trace.explanation}; stripped unsupported code, kept prose"
-            ).strip("; ")
-            logger.info("Code validation: stripped unsupported code, kept prose")
-            return stripped, trace
+            if _needs_prose_fallback(stripped) and llm is not None:
+                if settings.enable_code_self_correction:
+                    with timer("code_self_correction") as t_fix:
+                        stripped = self_correct_code_answer(query, stripped, nodes, llm)
+                    if get_current_timing() is not None:
+                        record_stage("code_self_correction", t_fix["elapsed_ms"])
+                    stripped = remove_orphan_code_preambles(stripped)
+                    trace.self_corrected = True
+
+            if stripped.strip() and stripped != LOW_CONFIDENCE_MESSAGE and not _needs_prose_fallback(stripped):
+                trace.passed = True
+                trace.fallback_applied = False
+                trace.validation_method = "strip_code"
+                trace.explanation = (
+                    f"{trace.explanation}; stripped unsupported code, kept prose"
+                ).strip("; ")
+                logger.info("Code validation: stripped unsupported code, kept prose")
+                return stripped, trace
 
     trace.fallback_applied = True
     logger.warning("Code validation failed after self-correction — low-confidence fallback")
@@ -392,4 +446,4 @@ def apply_code_validation_pipeline(
             logger.info("Code self-correction succeeded")
             return corrected, trace
 
-    return _apply_fail_mode(query, normalized, corrected, nodes, trace)
+    return _apply_fail_mode(query, normalized, corrected, nodes, trace, llm=judge)

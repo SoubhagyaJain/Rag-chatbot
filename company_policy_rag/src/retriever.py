@@ -21,15 +21,30 @@ from llama_index.core.postprocessor.types import BaseNodePostprocessor
 from llama_index.core.schema import NodeWithScore, QueryBundle
 
 from src.bm25_index import get_bm25_corpus_size
-from src.retrieval_scope import ScopeFilteredRetriever
+from src.retrieval_scope import ScopeFilteredRetriever, filter_nodes_by_metadata
 from src.citations import log_retrieval_stage
 from src.config import settings
 from src.hybrid_retrieval import HybridRetriever, bm25_nodes_for_query, reciprocal_rank_fusion
 from src.indexing import load_index
 from src.parent_retrieval import expand_to_parent_documents
 from src.postprocessors import RelativeScoreThresholdPostprocessor
+from src.agent_topic_pipeline import (
+    ensure_agent_topic_in_results,
+    finalize_agent_topic_context,
+)
+from src.building_block_pipeline import (
+    ensure_guidebook_topic_in_results,
+    finalize_guidebook_topic_context,
+)
+from src.code_retrieval import (
+    ensure_topic_nodes_in_results,
+    inject_retrieval_boost_chunks,
+    promote_code_tool_nodes,
+)
 from src.query_processing import (
+    augment_query_for_retrieval,
     build_multi_retrieval_queries,
+    is_code_or_tool_query,
     is_comprehensive_list_query,
     rewrite_query_for_retrieval,
 )
@@ -234,9 +249,16 @@ def get_node_postprocessors() -> list[BaseNodePostprocessor]:
     return processors
 
 
+def prepare_retrieval_query(query: str) -> str:
+    """Augment and optionally LLM-rewrite before vector search."""
+    if settings.enable_query_rewrite:
+        return rewrite_query_for_retrieval(query)
+    return augment_query_for_retrieval(query)
+
+
 def preprocess_query(query: str) -> str:
     """Apply query rewrite before vector search (shared by retriever + eval)."""
-    return rewrite_query_for_retrieval(query)
+    return prepare_retrieval_query(query)
 
 
 def _to_query_bundle(query: str | QueryBundle) -> QueryBundle:
@@ -260,8 +282,11 @@ def _diversify_comprehensive_nodes(
     nodes: list[NodeWithScore],
     *,
     max_per_section: int = 2,
+    code_query: bool = False,
 ) -> list[NodeWithScore]:
     """Cap chunks per section so list questions get heterogeneous rerank input."""
+    if code_query:
+        max_per_section = max(max_per_section, 3)
     buckets: dict[str, list[NodeWithScore]] = {}
     for node in nodes:
         meta = node.metadata or {}
@@ -297,7 +322,11 @@ def build_retriever(
     postprocessors = get_node_postprocessors()
     retriever: Any = base_retriever
     if postprocessors:
-        retriever = _PostprocessingRetriever(base_retriever, postprocessors)
+        retriever = _PostprocessingRetriever(
+            base_retriever,
+            postprocessors,
+            scope_filters=filters,
+        )
 
     should_rewrite = (
         apply_query_rewrite
@@ -305,8 +334,7 @@ def build_retriever(
         else settings.enable_query_rewrite
     )
 
-    if should_rewrite:
-        retriever = _QueryRewritingRetriever(retriever)
+    retriever = _QueryRewritingRetriever(retriever, apply_query_rewrite=should_rewrite)
 
     if filters:
         retriever = ScopeFilteredRetriever(retriever, filters)
@@ -326,16 +354,23 @@ class _PostprocessingRetriever:
         self,
         inner_retriever: Any,
         postprocessors: list[BaseNodePostprocessor],
+        *,
+        scope_filters: dict[str, Any] | None = None,
     ) -> None:
         self._inner = inner_retriever
         self._postprocessors = postprocessors
+        self._scope_filters = scope_filters
+
+    def _apply_scope(self, nodes: list[NodeWithScore]) -> list[NodeWithScore]:
+        return filter_nodes_by_metadata(nodes, self._scope_filters)
 
     def retrieve(self, query: str | QueryBundle) -> list[NodeWithScore]:
         bundle = _to_query_bundle(query)
         return self._retrieve_bundle(bundle)
 
     def retrieve_comprehensive(self, raw_query: str) -> list[NodeWithScore]:
-        """Multi-query Chroma retrieval for list/enumeration questions."""
+        """Multi-query Chroma retrieval for list/enumeration and code/tool questions."""
+        code_query = is_code_or_tool_query(raw_query)
         sub_queries = build_multi_retrieval_queries(
             raw_query,
             max_queries=settings.comprehensive_max_subqueries,
@@ -343,7 +378,7 @@ class _PostprocessingRetriever:
         merged: dict[str, NodeWithScore] = {}
         with timer("chroma_retrieve") as t_chroma:
             for sub_query in sub_queries:
-                rewritten = preprocess_query(sub_query)
+                rewritten = prepare_retrieval_query(sub_query)
                 bundle = QueryBundle(query_str=rewritten)
                 dense_nodes: list[NodeWithScore] = []
                 if hasattr(self._inner, "_dense"):
@@ -366,9 +401,11 @@ class _PostprocessingRetriever:
         if get_current_timing() is not None:
             record_stage("chroma_retrieve", t_chroma["elapsed_ms"])
 
-        nodes = _diversify_comprehensive_nodes(list(merged.values()))
+        merged_list = self._apply_scope(list(merged.values()))
+        merged_list = inject_retrieval_boost_chunks(merged_list, raw_query)
+        nodes = _diversify_comprehensive_nodes(merged_list, code_query=code_query)
         log_retrieval_stage("chroma_retrieved_comprehensive", nodes)
-        primary = QueryBundle(query_str=preprocess_query(raw_query))
+        primary = QueryBundle(query_str=prepare_retrieval_query(raw_query))
         reranker = get_reranker()
         original_top_n: int | None = None
         if reranker is not None and hasattr(reranker, "top_n"):
@@ -383,6 +420,9 @@ class _PostprocessingRetriever:
             finally:
                 if original_top_n is not None and reranker is not None:
                     reranker.top_n = original_top_n
+            filtered = ensure_topic_nodes_in_results(filtered, raw_query, nodes)
+            filtered = ensure_guidebook_topic_in_results(filtered, raw_query, nodes)
+            filtered = ensure_agent_topic_in_results(filtered, raw_query, nodes)
             if not filtered and nodes:
                 rerank_only = [
                     p
@@ -406,7 +446,10 @@ class _PostprocessingRetriever:
         top_n = get_final_top_k(comprehensive=True)
         filtered = filtered[:top_n]
         log_retrieval_stage("post_rerank_filter", filtered)
+        filtered = promote_code_tool_nodes(filtered, raw_query)
         filtered = expand_to_parent_documents(filtered)
+        filtered = finalize_guidebook_topic_context(filtered, raw_query)
+        filtered = finalize_agent_topic_context(filtered, raw_query)
         log_retrieval_stage("post_parent_expand", filtered)
         return filtered
 
@@ -415,13 +458,25 @@ class _PostprocessingRetriever:
             nodes = self._inner.retrieve(bundle)
         if get_current_timing() is not None:
             record_stage("chroma_retrieve", t_chroma["elapsed_ms"])
+        nodes = self._apply_scope(nodes)
+        nodes = inject_retrieval_boost_chunks(nodes, bundle.query_str)
         log_retrieval_stage("chroma_retrieved", nodes)
         with timer("rerank_filter") as t_rerank:
             filtered = apply_postprocessors(nodes, bundle, self._postprocessors)
         if get_current_timing() is not None:
             record_stage("rerank_filter", t_rerank["elapsed_ms"])
+        filtered = ensure_topic_nodes_in_results(filtered, bundle.query_str, nodes)
+        filtered = ensure_guidebook_topic_in_results(
+            filtered, bundle.query_str, nodes
+        )
+        filtered = ensure_agent_topic_in_results(
+            filtered, bundle.query_str, nodes
+        )
         log_retrieval_stage("post_rerank_filter", filtered)
+        filtered = promote_code_tool_nodes(filtered, bundle.query_str)
         filtered = expand_to_parent_documents(filtered)
+        filtered = finalize_guidebook_topic_context(filtered, bundle.query_str)
+        filtered = finalize_agent_topic_context(filtered, bundle.query_str)
         log_retrieval_stage("post_parent_expand", filtered)
         return filtered
 
@@ -444,39 +499,40 @@ class _PostprocessingRetriever:
 
 class _QueryRewritingRetriever:
     """
-    Thin wrapper: rewrite query → delegate to inner retriever.
+    Routes comprehensive/code queries and optionally LLM-rewrites before retrieval.
 
-    Keeps rewrite logic out of Chainlit / agent / eval call sites.
+    Comprehensive routing stays enabled even when ENABLE_QUERY_REWRITE=false (CI smoke).
     """
 
-    def __init__(self, inner_retriever: Any) -> None:
+    def __init__(self, inner_retriever: Any, *, apply_query_rewrite: bool = True) -> None:
         self._inner = inner_retriever
+        self._apply_query_rewrite = apply_query_rewrite
+
+    def _prepare_query(self, raw: str) -> str:
+        if self._apply_query_rewrite:
+            return prepare_retrieval_query(raw)
+        return augment_query_for_retrieval(raw)
 
     def retrieve(self, query: str | QueryBundle) -> Any:
         raw = query.query_str if isinstance(query, QueryBundle) else query
-        if (
-            settings.enable_comprehensive_retrieval
-            and is_comprehensive_list_query(raw)
-            and hasattr(self._inner, "retrieve_comprehensive")
+        if settings.enable_comprehensive_retrieval and hasattr(
+            self._inner, "retrieve_comprehensive"
         ):
-            logger.info("Comprehensive list retrieval enabled for query")
-            return self._inner.retrieve_comprehensive(raw)
+            if is_comprehensive_list_query(raw):
+                logger.info("Comprehensive list retrieval enabled for query")
+                return self._inner.retrieve_comprehensive(raw)
+            if is_code_or_tool_query(raw):
+                logger.info("Comprehensive code/tool retrieval enabled for query")
+                return self._inner.retrieve_comprehensive(raw)
 
-        if isinstance(query, QueryBundle):
-            rewritten = preprocess_query(raw)
-            bundle = QueryBundle(query_str=rewritten)
-        else:
-            bundle = QueryBundle(query_str=preprocess_query(raw))
+        bundle = QueryBundle(query_str=self._prepare_query(raw))
         return self._inner.retrieve(bundle)
 
     # LlamaIndex QueryEngine may call aretrieve
     async def aretrieve(self, query: str | QueryBundle) -> Any:
         if hasattr(self._inner, "aretrieve"):
-            if isinstance(query, QueryBundle):
-                raw = query.query_str
-                bundle = QueryBundle(query_str=preprocess_query(raw))
-            else:
-                bundle = QueryBundle(query_str=preprocess_query(query))
+            raw = query.query_str if isinstance(query, QueryBundle) else query
+            bundle = QueryBundle(query_str=self._prepare_query(raw))
             return await self._inner.aretrieve(bundle)
         return self.retrieve(query)
 
@@ -510,6 +566,9 @@ def get_retrieval_config_summary() -> dict[str, Any]:
         "bm25_corpus_size": get_bm25_corpus_size(),
         "enable_parent_document_retrieval": settings.enable_parent_document_retrieval,
         "enable_corpus_scoped_retrieval": settings.enable_corpus_scoped_retrieval,
+        "enable_code_retrieval_boost": settings.enable_code_retrieval_boost,
+        "code_chunk_inject_min": settings.code_chunk_inject_min,
+        "code_boost_score_multiplier": settings.code_boost_score_multiplier,
     }
 
 

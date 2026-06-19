@@ -289,6 +289,15 @@ class Settings(BaseSettings):
     )
     comprehensive_max_subqueries: int = Field(default=12, alias="COMPREHENSIVE_MAX_SUBQUERIES")
 
+    # ── Code/tool retrieval boost ─────────────────────────────────────────
+    enable_code_retrieval_boost: bool = Field(
+        default=True, alias="ENABLE_CODE_RETRIEVAL_BOOST"
+    )
+    code_chunk_inject_min: int = Field(default=1, alias="CODE_CHUNK_INJECT_MIN")
+    code_boost_score_multiplier: float = Field(
+        default=1.2, alias="CODE_BOOST_SCORE_MULTIPLIER"
+    )
+
     # ── Response language ──────────────────────────────────────────────────
     # english = always English (recommended for qwen2.5); match_query = follow user language
     response_language: Literal["english", "chinese", "match_query"] = Field(

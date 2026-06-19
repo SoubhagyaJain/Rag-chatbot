@@ -1,0 +1,51 @@
+{
+  "version": "1.0",
+  "corpus": "guidebook",
+  "source_document": "data/legal/AI_Agents_guidebook.pdf",
+  "description": "Tool/code generation regression subset (currency rel fixes).",
+  "case_count": 2,
+  "query_type_counts": {
+    "code": 1,
+    "factual": 1
+  },
+  "cases": [
+    {
+      "id": "currency_tool_example",
+      "corpus": "guidebook",
+      "query_type": "code",
+      "category": "code",
+      "question": "Show the currency conversion tool example and explain how it is invoked.",
+      "expected_answer": "Should reference the real-time currency tool and CurrencyConverterTool prose; no invented def bodies.",
+      "relevant_sections": [
+        "currency",
+        "conversion",
+        "tool",
+        "CurrencyConverterTool",
+        "currency_analyst"
+      ],
+      "expected_key_points": [
+        "currency",
+        "tool"
+      ],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "tools_real_world",
+      "corpus": "guidebook",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "What real-world capability does the currency tool demonstrate?",
+      "expected_answer": "Should explain real-time currency conversion with live exchange rates from external API.",
+      "relevant_sections": [
+        "real-time currency",
+        "conversion",
+        "exchange rate"
+      ],
+      "expected_key_points": [
+        "currency",
+        "exchange"
+      ],
+      "source_file": "AI_Agents_guidebook.pdf"
+    }
+  ]
+}

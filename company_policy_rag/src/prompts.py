@@ -148,7 +148,12 @@ Excerpt [Source 1]: "We set up an MCP server for the financial analyst crew."
 Bad answer: "MCP stands for Multi-Agent Control Panel..."
 Why bad: Never expand acronyms unless the excerpt defines them — quote how the excerpt uses MCP.
 
-### Example T — GOOD (named agent roles only)
+### Example T — GOOD (manager agent when named in excerpt)
+Question: What does a manager agent do in a multi-agent setup?
+Excerpt [Source 1]: "A manager agent coordinates multiple sub-agents and decides the next steps iteratively. A human lays out the hierarchy between agents, their roles, tools, etc."
+Answer: Based on the available information in the documents, a manager agent coordinates multiple sub-agents and decides the next steps iteratively [Source 1]. A human lays out the hierarchy between agents, their roles, and tools [Source 1].
+
+### Example T2 — GOOD (manager agent absent from excerpt)
 Question: What does a manager agent do in a multi-agent setup?
 Excerpt [Source 1]: CrewAI orchestrates web search, research analyst, and technical writer agents.
 Answer: Based on the available information in the documents, the excerpts describe CrewAI orchestrating specialized agents such as web search, research analyst, and technical writer agents [Source 1]. The excerpts do not mention a "manager agent" role by name.
@@ -179,27 +184,54 @@ Question: What roles can sub-agents play in orchestration?
 Excerpt [Source 1]: "Research agent gathers data; writer agent drafts output."
 Bad answer: Adds "Manager agent coordinates the crew" when manager is not named.
 Why bad: List only agent roles verbatim in excerpts — never add coordinator/manager archetypes.
+
+### Example Y — GOOD (Guardrails building block)
+Question: What are Guardrails in AI agents and why are they used?
+Excerpt [Source 1]: "4. Guardrails — ensure agents stay within safe boundaries; limit tool usage; validation checkpoints."
+Answer: Based on the available information in the documents, Guardrails are a building block that helps ensure agents stay within safe boundaries [Source 1]. They are used to limit tool usage and set validation checkpoints so agents do not overuse APIs or produce unsafe outputs [Source 1].
+
+### Example Z — GOOD (Planning building block — not design-pattern planning)
+Question: What is the Planning building block in AI agents?
+Excerpt [Source 1]: "5. Planning — subdividing tasks and outlining objectives to solve tasks more effectively."
+Answer: Based on the available information in the documents, the Planning building block involves subdividing tasks and outlining objectives so agents can solve tasks more effectively [Source 1].
+
+### Example Z2 — BAD (Planning building block vs planning pattern) — NEVER DO THIS
+Question: What is the Planning building block in AI agents?
+Excerpt [Source 5]: "ReAct combines reflection and tool use…" (design patterns chapter)
+Bad answer: Describes ReAct or plan-and-execute as the Planning building block.
+Why bad: Answer from the six building blocks / 5 Levels section — not the design-patterns chapter.
+
+### Example AA — GOOD (guidebook edge case — HR topic absent)
+Question: How many vacation days do nonprofit employees accrue per the AI Agents guidebook?
+Excerpts: (AI agents, tools, workflows only — no HR or vacation policy)
+Answer: The provided documents do not contain sufficient information to answer this question reliably. The excerpts do not mention vacation days, nonprofit employees, or leave policies.
+
+### Example AB — GOOD (RAG inside agent workflow)
+Question: How is RAG used inside an agent workflow?
+Excerpt [Source 1]: "Agentic RAG — Retriever Agent accepts the user query, invokes a vector DB or web search tool to get context, Writer Agent generates a response."
+Answer: Based on the available information in the documents, Agentic RAG uses a Retriever Agent that accepts the user query and invokes tools such as a vector DB or web search to fetch context [Source 1]. A Writer Agent then generates the response from that retrieved context [Source 1].
+
+### Example AC — GOOD (Memory building block mechanics)
+Question: How does Memory work as a building block of AI agents?
+Excerpt [Source 1]: "Without memory, an agent would start fresh every time… Short-term memory exists during execution; long-term memory persists after execution; entity memory stores key subjects."
+Answer: Based on the available information in the documents, memory lets agents retain context across interactions instead of starting fresh each time [Source 1]. Short-term memory exists during execution (e.g., recent conversation history), long-term memory persists after execution (e.g., user preferences), and entity memory stores information about key subjects discussed [Source 1].
 """
 
 FEW_SHOT_CODE_BALANCED = """
-### Example K — GOOD (code quoted verbatim from excerpt)
-Question: Show the currency conversion tool example.
-Excerpt [Source 1]: [CODE BLOCK — guide.pdf p.20]
-def convert_currency(amount, from_curr, to_curr):
-    rate = get_exchange_rate(from_curr, to_curr)
-    return amount * rate
-Answer: Based on the available information in the documents, the currency tool is defined as:
-```python
-def convert_currency(amount, from_curr, to_curr):
-    rate = get_exchange_rate(from_curr, to_curr)
-    return amount * rate
-```
-[Source 1]
+### Example K — GOOD (currency tool — prose when no def in excerpts)
+Question: Show the currency conversion tool example and explain how it is invoked.
+Excerpt [Source 1]: "A real-time currency conversion tool fetches live exchange rates from an external API. CurrencyConverterTool implements conversion. The currency_analyst agent uses it via Crew."
+Answer: Based on the available information in the documents, the guidebook describes a real-time currency conversion tool that fetches live exchange rates from an external API [Source 1]. It presents CurrencyConverterTool for conversion [Source 1]. A currency_analyst agent invokes it through the Crew execution pattern shown in the excerpt [Source 1]. The excerpts do not include a complete convert_currency function body — describe only what the excerpts show.
+
+### Example K2 — GOOD (real-world currency capability — cite matching source)
+Question: What real-world capability does the currency tool demonstrate?
+Excerpt [Source 1]: "real-time currency conversion tool… live exchange rates from external API"
+Answer: Based on the available information in the documents, the currency tool demonstrates real-time currency conversion using live exchange rates fetched from an external API [Source 1].
 
 ### Example L — BAD (invented code) — NEVER DO THIS
 Question: Show the currency conversion tool example.
-Bad answer includes `def fetch_forex_api()` or renames functions not present in the excerpt.
-Why bad: Every code line must appear in the retrieved context — do not invent or complete partial snippets.
+Bad answer includes `def convert_currency()`, `def fetch_forex_api()`, or `get_exchange_rate()` when those definitions do not appear in the excerpts.
+Why bad: Every code line must appear in the retrieved context — do not invent or complete partial snippets. If only prose names CurrencyConverterTool, answer in prose.
 
 ### Example M2 — GOOD (custom tools — excerpt examples only)
 Question: How do you build custom tools for an agent?
@@ -324,13 +356,19 @@ BALANCED_TEXT_QA_PROMPT_TMPL = (
     "22. For comparison questions (Agent vs LLM vs RAG, agent vs plain LLM), state differences "
     "ONLY as supported by excerpts — do not add outside definitions. For tech-stack or link "
     "questions, list ONLY products/URLs explicitly named in excerpts.\n"
-    "23. For agent-role questions, name ONLY roles/agents that appear verbatim in excerpts. If the "
-    "question asks about a role not named (e.g. 'manager agent'), say the excerpts do not use "
-    "that term and cite the closest related agents that ARE named.\n"
+    "23. For agent-role questions, describe roles that appear verbatim in excerpts. When "
+    "'manager agent' is named, explain its coordination role — do not claim it is absent.\n"
     "24. For URL / link questions, include ONLY URLs or paths that appear verbatim in excerpts — "
     "never invent github.com, huggingface.co, or other links from outside knowledge.\n"
-    "25. For memory-type or taxonomy questions, use ONLY category names that appear in excerpts "
-    "(e.g. do not introduce 'short-term' / 'long-term' unless those phrases appear).\n\n"
+    "25. For memory building-block questions, explain how memory works using excerpt wording. "
+    "Use memory subtype names (short-term, long-term, entity) ONLY when those phrases appear.\n"
+    "26. For building-block questions (Guardrails, Planning, Memory, Tools, Role-playing), answer from "
+    "the six building blocks / 5 Levels sections — not from the design-patterns chapter.\n"
+    "27. For Planning building block questions, do NOT describe ReAct, plan-and-execute, or other "
+    "design patterns unless the excerpt defines Planning as that pattern.\n"
+    "28. For guidebook questions about employee benefits, vacation, PTO, or HR policy: respond with "
+    "ONLY the insufficient-information message and name the missing topic — no partial "
+    f"\"{PARTIAL_ANSWER_PREFIX}\" follow-up.\n\n"
     f"{FEW_SHOT_BALANCED}\n"
     f"{FEW_SHOT_CODE_BALANCED}\n"
     "DOCUMENT EXCERPTS:\n"
@@ -635,6 +673,11 @@ def get_faithfulness_claim_trim_prompt() -> str:
     return FAITHFULNESS_CLAIM_TRIM_PROMPT
 
 
+def _escape_prompt_braces(text: str) -> str:
+    """Escape braces so str.format on prompt templates does not treat code as placeholders."""
+    return text.replace("{", "{{").replace("}", "}}")
+
+
 def get_code_validation_prompt(
     *,
     mode: str = "balanced",
@@ -642,7 +685,9 @@ def get_code_validation_prompt(
 ) -> str:
     failed_section = ""
     if failed_lines:
-        lines = "\n".join(f"- {line}" for line in failed_lines[:8])
+        lines = "\n".join(
+            f"- {_escape_prompt_braces(line)}" for line in failed_lines[:8]
+        )
         failed_section = f"\nLines that failed heuristic check:\n{lines}\n"
     if mode == "strict":
         return CODE_LINE_VALIDATION_PROMPT_STRICT.format(

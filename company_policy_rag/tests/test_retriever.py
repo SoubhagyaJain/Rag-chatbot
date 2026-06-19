@@ -102,3 +102,4 @@ def test_retrieval_config_includes_phase2_flags() -> None:
     assert "enable_hybrid_bm25" in summary
     assert "enable_parent_document_retrieval" in summary
     assert summary["enable_hybrid_bm25"] is True
+    assert "enable_code_retrieval_boost" in summary

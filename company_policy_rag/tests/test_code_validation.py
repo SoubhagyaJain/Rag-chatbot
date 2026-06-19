@@ -8,19 +8,44 @@ from llama_index.core.schema import NodeWithScore, TextNode
 
 from src.code_validation import (
     HeuristicResult,
+    _escape_format_braces,
     answer_contains_code,
     apply_code_validation_pipeline,
     context_contains_code,
     extract_code_lines,
     heuristic_code_grounded,
+    remove_orphan_code_preambles,
     should_validate_code,
     strip_unsupported_code,
 )
+from src.prompts import get_code_validation_prompt
 from src.prompts import LOW_CONFIDENCE_MESSAGE
 
 
 def _node(text: str, **meta: str) -> NodeWithScore:
     return NodeWithScore(node=TextNode(text=text, metadata=dict(meta)), score=0.9)
+
+
+class TestPromptFormatting:
+    def test_escape_format_braces_allows_code_in_validation_prompt(self) -> None:
+        template = get_code_validation_prompt(mode="balanced")
+        answer = "return {converted_amount}"
+        prompt = template.format(
+            context=_escape_format_braces("ctx"),
+            answer=_escape_format_braces(answer),
+        )
+        assert "{converted_amount}" in prompt
+
+    def test_failed_lines_with_braces_do_not_break_prompt_format(self) -> None:
+        template = get_code_validation_prompt(
+            mode="balanced",
+            failed_lines=["return {from_curr}"],
+        )
+        prompt = template.format(
+            context=_escape_format_braces("ctx"),
+            answer=_escape_format_braces("answer"),
+        )
+        assert "{from_curr}" in prompt
 
 
 class TestCodeDetection:
@@ -104,6 +129,15 @@ class TestCodeExtraction:
 
 
 class TestStripUnsupportedCode:
+    def test_remove_orphan_code_preamble(self) -> None:
+        answer = (
+            "Based on the available information in the documents, the currency tool is defined as:\n"
+            "The guidebook describes real-time currency conversion [Source 1]."
+        )
+        cleaned = remove_orphan_code_preambles(answer)
+        assert "defined as" not in cleaned
+        assert "real-time currency conversion" in cleaned
+
     def test_strips_failed_fence_keeps_prose(self) -> None:
         answer = (
             "The tool converts currency in real time.\n\n"

@@ -1,0 +1,42 @@
+{
+  "version": "1.0",
+  "corpus": "guidebook",
+  "source_document": "data/legal/AI_Agents_guidebook.pdf",
+  "description": "Round-1 building-block fix subset (guardrails, planning, abstention).",
+  "case_count": 3,
+  "cases": [
+    {
+      "id": "guardrails_block",
+      "corpus": "guidebook",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "What are Guardrails in AI agents and why are they used?",
+      "expected_answer": "Should explain safety/constraint guardrails.",
+      "relevant_sections": ["Guardrails", "guardrail"],
+      "expected_key_points": ["guardrail"],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "planning_block",
+      "corpus": "guidebook",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "What is the Planning building block in AI agents?",
+      "expected_answer": "Should explain planning/decomposition from six building blocks.",
+      "relevant_sections": ["Planning", "planning"],
+      "expected_key_points": ["planning"],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "abstention_company_vacation",
+      "corpus": "guidebook",
+      "query_type": "edge_case",
+      "category": "edge_case",
+      "question": "How many vacation days do nonprofit employees accrue per the AI Agents guidebook?",
+      "expected_answer": "Should abstain — handbook topic not in guidebook.",
+      "relevant_sections": [""],
+      "expected_key_points": ["not", "insufficient"],
+      "source_file": "AI_Agents_guidebook.pdf"
+    }
+  ]
+}

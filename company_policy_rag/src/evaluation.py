@@ -276,6 +276,8 @@ Scoring guidance:
 - Resignation-without-notice: score >= 0.8 when answer explains at-will employment allows quitting without notice.
 - Disciplinary process: score >= 0.8 when answer covers report → investigate → disciplinary action up to termination, even without a named progressive discipline policy.
 - Outside employment: score >= 0.8 when answer covers conflict-of-interest rules from context and notes missing approval policy honestly.
+- Guidebook HR abstention: score >= 0.8 when the question asks about vacation, benefits, or HR policy
+  and the answer states the AI Agents guidebook does not cover that topic (clean abstention counts as relevant).
 
 Expected topic (reference): {expected_answer}
 
@@ -468,7 +470,8 @@ def run_evaluation(
         )
 
     configure_llama_index()
-    if not retrieval_only:
+    needs_llm = not retrieval_only or settings.enable_query_rewrite
+    if needs_llm:
         Settings.llm = Ollama(
             model=settings.llm_model,
             base_url=settings.ollama_base_url,

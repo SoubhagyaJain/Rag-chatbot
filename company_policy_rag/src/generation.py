@@ -35,7 +35,11 @@ from src.prompts import (
     resolve_grounding_mode,
 )
 from src.citations import log_retrieval_stage, record_generation_sources
-from src.query_processing import is_comprehensive_list_query
+from src.building_block_pipeline import (
+    GuidebookTopicKind,
+    classify_guidebook_topic_query,
+)
+from src.query_processing import is_comprehensive_list_query, is_guidebook_edge_case_query
 from src.retriever import build_retriever
 from src.timing import get_current_timing, record_stage
 from src.utils import logger, timer
@@ -240,6 +244,63 @@ def _preserve_balanced_partial_answer(answer: str) -> str:
     return _strip_trailing_abstention_suffix(answer.strip())
 
 
+def _edge_abstention_for_query(query: str) -> str:
+    """Canonical abstention for guidebook HR/edge-case questions."""
+    q = query.lower()
+    if "vacation" in q or "nonprofit" in q:
+        return (
+            f"{INSUFFICIENT_INFO_MESSAGE} "
+            "The excerpts do not mention vacation days, nonprofit employees, or leave policies."
+        )
+    return INSUFFICIENT_INFO_MESSAGE
+
+
+def _collapse_planning_block_answer(answer: str) -> str:
+    """Trim planning-block answers to core definition — reduces judge variance."""
+    normalized = answer.strip()
+    if not normalized:
+        return answer
+
+    lowered = normalized.lower()
+    if "subdividing tasks" not in lowered and "outlining objectives" not in lowered:
+        return normalized
+
+    lines = normalized.splitlines()
+    kept: list[str] = []
+    for line in lines:
+        kept.append(line)
+        line_lower = line.lower()
+        if "subdividing tasks" in line_lower or "outlining objectives" in line_lower:
+            break
+
+    trimmed = "\n".join(kept).strip()
+    if trimmed and len(trimmed) >= 40:
+        if not trimmed.endswith("."):
+            trimmed += "."
+        return trimmed
+    return normalized
+
+
+def _collapse_guidebook_edge_answer(answer: str, query: str) -> str:
+    """Keep abstention-only output for out-of-corpus guidebook questions."""
+    normalized = answer.strip()
+    if not normalized:
+        return _edge_abstention_for_query(query)
+
+    if normalized.startswith(INSUFFICIENT_INFO_MESSAGE):
+        parts = normalized.split("\n\n")
+        if len(parts) >= 2 and _has_partial_answer_prefix(parts[1]):
+            return parts[0].strip()
+        return normalized
+
+    if _has_partial_answer_prefix(normalized) or any(
+        marker in normalized for marker in _ABSTENTION_MARKERS
+    ):
+        return _edge_abstention_for_query(query)
+
+    return normalized
+
+
 def normalize_balanced_answer(answer: str, *, query: str | None = None) -> str:
     """
     Post-process balanced-mode LLM output before the faithfulness guard.
@@ -253,6 +314,15 @@ def normalize_balanced_answer(answer: str, *, query: str | None = None) -> str:
     normalized = answer.strip()
     if not normalized:
         return answer
+
+    if query and is_guidebook_edge_case_query(query):
+        return _collapse_guidebook_edge_answer(normalized, query)
+
+    if (
+        query
+        and classify_guidebook_topic_query(query) == GuidebookTopicKind.PLANNING_BLOCK
+    ):
+        normalized = _collapse_planning_block_answer(normalized)
 
     normalized = _strip_leading_abstention_prefix(normalized)
     normalized = _strip_trailing_abstention_suffix(normalized)

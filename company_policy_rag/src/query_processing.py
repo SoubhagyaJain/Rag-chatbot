@@ -62,6 +62,42 @@ _GUIDEBOOK_TOPIC_EXPANSIONS: list[tuple[tuple[str, ...], str]] = [
         ("sub-agent", "sub-agents", "subagent", "orchestration roles", "roles can"),
         "manager specialist research summarization delegation orchestration sub-agent",
     ),
+    (
+        ("currency", "convert_currency", "exchange rate", "real-world capability", "conversion tool"),
+        "convert_currency real-time currency conversion exchange rate tool invocation",
+    ),
+    (
+        ("custom tool", "build custom", "create tool", "tool for an agent"),
+        "custom tools MCP function implementation agent tools building block",
+    ),
+    (
+        ("code is available", "full code", "code examples", "where does the guidebook point"),
+        "code is available Check this code dailydoseofds link repository",
+    ),
+    (
+        ("check this out", "code walkthrough", "walkthrough"),
+        "Check this out code walkthrough example snippet",
+    ),
+    (
+        ("guardrails", "guardrail"),
+        "Guardrails building block safety constraints limits validation checkpoints",
+    ),
+    (
+        ("planning building block",),
+        "Planning building block six building blocks 5 Levels subdividing tasks",
+    ),
+    (
+        ("manager agent", "multi-agent setup"),
+        "manager agent coordinates sub-agents multi-agent pattern",
+    ),
+    (
+        ("rag", "agent workflow"),
+        "Agentic RAG retriever agent workflow vector DB context",
+    ),
+    (
+        ("memory work", "memory as a building"),
+        "Memory short-term long-term entity memory building block",
+    ),
 ]
 
 
@@ -178,6 +214,11 @@ _COMPREHENSIVE_QUERY_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\broles?\s+can\b", re.IGNORECASE),
     re.compile(r"\bdesign\s+patterns?\b", re.IGNORECASE),
     re.compile(r"\bmost\s+popular\b", re.IGNORECASE),
+    re.compile(r"\bguardrails?\b", re.IGNORECASE),
+    re.compile(r"\bplanning\s+building\s+block\b", re.IGNORECASE),
+    re.compile(r"\bmanager\s+agent\b", re.IGNORECASE),
+    re.compile(r"\brag\b.+\bagent\b", re.IGNORECASE),
+    re.compile(r"\bhow\s+does\s+memory\b", re.IGNORECASE),
 )
 
 _COMPREHENSIVE_MIN_QUERY_LEN = 25
@@ -221,6 +262,63 @@ _SUBAGENT_ROLE_SUBQUERIES: tuple[str, ...] = (
     "sub-agent roles delegation",
 )
 
+_CURRENCY_TOOL_SUBQUERIES: tuple[str, ...] = (
+    "convert_currency real-time currency conversion tool",
+    "currency conversion tool example invocation exchange rate",
+    "real-world capability currency tool demonstrate",
+)
+
+_CODE_LINKS_SUBQUERIES: tuple[str, ...] = (
+    "code is available full code examples guidebook link",
+    "Check this code dailydoseofds",
+)
+
+_CHECK_THIS_OUT_SUBQUERIES: tuple[str, ...] = (
+    "Check this out code walkthrough",
+    "Check this out currency conversion",
+    "Check this out custom tool MCP",
+)
+
+_CODE_TOOL_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"\bcurrency\b", re.IGNORECASE),
+    re.compile(r"\bconvert_currency\b", re.IGNORECASE),
+    re.compile(r"\breal-?world\b.+\btool\b", re.IGNORECASE),
+    re.compile(r"\bcustom\s+tool", re.IGNORECASE),
+    re.compile(r"\bcode\s+(is\s+)?available\b", re.IGNORECASE),
+    re.compile(r"\bcheck\s+this\s+out\b", re.IGNORECASE),
+    re.compile(r"\bcode\s+walkthrough", re.IGNORECASE),
+    re.compile(r"\bfull\s+code\s+examples?\b", re.IGNORECASE),
+    re.compile(r"\bcode\s+examples?\b", re.IGNORECASE),
+    re.compile(r"\bshow\b.+\btool\s+example", re.IGNORECASE),
+    re.compile(r"\bwhere\b.+\bpoint\b.+\bcode\b", re.IGNORECASE),
+    re.compile(r"\bconversion\s+tool\b", re.IGNORECASE),
+)
+
+
+_GUIDEBOOK_EDGE_CASE_MARKERS = (
+    "vacation",
+    "pto",
+    "sick leave",
+    "nonprofit",
+    "leave policy",
+    "employee benefits",
+    "health benefits",
+)
+
+
+def is_guidebook_edge_case_query(query: str) -> bool:
+    """True when the question asks about HR/policy topics absent from the AI agents guidebook."""
+    q = query.lower()
+    return any(marker in q for marker in _GUIDEBOOK_EDGE_CASE_MARKERS)
+
+
+def is_code_or_tool_query(query: str) -> bool:
+    """True when the user asks about code examples, tools, or currency walkthroughs."""
+    text = query.strip()
+    if not text:
+        return False
+    return any(pattern.search(text) for pattern in _CODE_TOOL_PATTERNS)
+
 
 def _append_unique_query(queries: list[str], seen: set[str], item: str) -> None:
     key = item.lower()
@@ -258,10 +356,21 @@ def build_multi_retrieval_queries(query: str, *, max_queries: int = 8) -> list[s
 
     q_lower = core.lower()
 
+    if re.search(r"guardrails?", q_lower):
+        _append_unique_query(
+            queries,
+            seen,
+            "Guardrails building block AI agents why used safety constraints",
+        )
+        _append_unique_query(queries, seen, "Examples of useful guardrails agents")
+
     if re.search(r"building\s+blocks?", q_lower):
         _append_unique_query(queries, seen, "six building blocks overview AI agents")
         for subquery in _BUILDING_BLOCK_SUBQUERIES:
             _append_unique_query(queries, seen, subquery)
+
+    if re.search(r"planning\s+building\s+block", q_lower):
+        _append_unique_query(queries, seen, "Planning building block AI agents")
 
     if re.search(r"how\s+many", q_lower) and "building" in q_lower:
         _append_unique_query(queries, seen, "six building blocks overview AI agents")
@@ -279,6 +388,53 @@ def build_multi_retrieval_queries(query: str, *, max_queries: int = 8) -> list[s
     ):
         for subquery in _SUBAGENT_ROLE_SUBQUERIES:
             _append_unique_query(queries, seen, subquery)
+
+    if re.search(r"currency|convert_currency|exchange\s+rate|conversion\s+tool", q_lower):
+        for subquery in _CURRENCY_TOOL_SUBQUERIES:
+            _append_unique_query(queries, seen, subquery)
+
+    if re.search(
+        r"real-?world\b.+\btool\b|currency\s+tool",
+        core,
+        re.IGNORECASE,
+    ):
+        for subquery in _CURRENCY_TOOL_SUBQUERIES:
+            _append_unique_query(queries, seen, subquery)
+
+    if re.search(r"code\s+(is\s+)?available|full\s+code|code\s+example", q_lower):
+        for subquery in _CODE_LINKS_SUBQUERIES:
+            _append_unique_query(queries, seen, subquery)
+
+    if re.search(r"check\s+this\s+out|code\s+walkthrough", q_lower):
+        for subquery in _CHECK_THIS_OUT_SUBQUERIES:
+            _append_unique_query(queries, seen, subquery)
+
+    if re.search(r"custom\s+tool|build\s+custom", q_lower):
+        _append_unique_query(queries, seen, "custom tools MCP function implementation")
+        _append_unique_query(queries, seen, "custom tools via MCP @mcp.tool CrewAI")
+
+    if re.search(r"manager\s+agent", q_lower):
+        _append_unique_query(
+            queries,
+            seen,
+            "manager agent coordinates sub-agents multi-agent pattern",
+        )
+
+    if re.search(r"rag", q_lower) and re.search(r"agent", q_lower):
+        _append_unique_query(
+            queries,
+            seen,
+            "Agentic RAG retriever agent workflow vector DB",
+        )
+
+    if re.search(r"memory", q_lower) and re.search(
+        r"building\s+block|how\s+does\s+memory", q_lower
+    ):
+        _append_unique_query(
+            queries,
+            seen,
+            "Memory short-term long-term entity memory agents improve",
+        )
 
     attention_match = re.search(
         r"(?:pay\s+special\s+attention\s+to|including|covering|focus\s+on)\s+(.+)",

@@ -1,0 +1,86 @@
+{
+  "version": "1.0",
+  "corpus": "guidebook",
+  "source_document": "data/legal/AI_Agents_guidebook.pdf",
+  "description": "Round-2 agent-topic fix subset (manager, RAG, memory, custom tools) plus round-1 regression.",
+  "case_count": 7,
+  "cases": [
+    {
+      "id": "guardrails_block",
+      "corpus": "guidebook",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "What are Guardrails in AI agents and why are they used?",
+      "expected_answer": "Should explain safety/constraint guardrails.",
+      "relevant_sections": ["Guardrails", "guardrail"],
+      "expected_key_points": ["guardrail"],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "planning_block",
+      "corpus": "guidebook",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "What is the Planning building block in AI agents?",
+      "expected_answer": "Should explain planning/decomposition from six building blocks.",
+      "relevant_sections": ["Planning", "planning"],
+      "expected_key_points": ["planning"],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "abstention_company_vacation",
+      "corpus": "guidebook",
+      "query_type": "edge_case",
+      "category": "edge_case",
+      "question": "How many vacation days do nonprofit employees accrue per the AI Agents guidebook?",
+      "expected_answer": "Should abstain — handbook topic not in guidebook.",
+      "relevant_sections": [""],
+      "expected_key_points": ["not", "insufficient"],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "memory_block",
+      "corpus": "guidebook",
+      "query_type": "factual",
+      "category": "factual",
+      "question": "How does Memory work as a building block of AI agents?",
+      "expected_answer": "Should explain memory types and persistence.",
+      "relevant_sections": ["Memory", "short-term", "long-term"],
+      "expected_key_points": ["memory"],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "manager_agent",
+      "corpus": "guidebook",
+      "query_type": "workflow",
+      "category": "workflow",
+      "question": "What does a manager agent do in a multi-agent setup?",
+      "expected_answer": "Should explain coordination of sub-agents.",
+      "relevant_sections": ["manager agent", "sub-agent", "coordinates"],
+      "expected_key_points": ["manager", "agent"],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "rag_in_agent",
+      "corpus": "guidebook",
+      "query_type": "workflow",
+      "category": "workflow",
+      "question": "How is RAG used inside an agent workflow?",
+      "expected_answer": "Should explain retrieval step in agent.",
+      "relevant_sections": ["retrieves the relevant context", "RAG", "retrieval"],
+      "expected_key_points": ["RAG", "retriev"],
+      "source_file": "AI_Agents_guidebook.pdf"
+    },
+    {
+      "id": "custom_tools",
+      "corpus": "guidebook",
+      "query_type": "code",
+      "category": "code",
+      "question": "How do you build custom tools for an agent?",
+      "expected_answer": "Should describe custom tool creation with code.",
+      "relevant_sections": ["custom tool", "Tools allow"],
+      "expected_key_points": ["custom", "tool"],
+      "source_file": "AI_Agents_guidebook.pdf"
+    }
+  ]
+}
