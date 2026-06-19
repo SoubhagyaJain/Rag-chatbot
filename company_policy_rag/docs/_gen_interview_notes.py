@@ -60,8 +60,8 @@ add_qs("opening", [
     ("Walk me through this project in 60 seconds.", "Tests communication clarity and whether you lead with impact or buzzwords.",
      ["Employees need handbook answers they can trust — not confident hallucinations.",
       "I built an eval-driven RAG: dual-corpus index (308 chunks) → hybrid BM25+dense → rerank → grounded generation → faithfulness guard → code validation → citation-filtered UI.",
-      "As solo AI/ML engineer I owned pipeline, eval harness, UI, Docker, and 180 tests.",
-      "Policy: relevancy 0.40→0.747 (+87%) on 15-case set (run 104356). Guidebook: full rel 0.700 (run 164848, gate passed); enumeration rel 0.84—measured faithfulness/helpfulness trade-off explicitly."],
+      "As solo AI/ML engineer I owned pipeline, eval harness, UI, Docker, and 222 tests.",
+      "Policy: relevancy 0.40→0.747 (+87%) on 15-case set (run 104356). Guidebook: rel 0.766, hit 0.886 (run 101844, exceeds gate); enumeration rel 0.84—measured faithfulness/helpfulness trade-off explicitly."],
      "README2.md, src/evaluation.py", ["What would you do differently?", "Biggest failure?"], "opening"),
     ("Why is this relevant to Anthropic's work?", "Checks alignment with helpful, harmless, honest systems — not just demo RAG.",
      ["Anthropic cares about trade-offs between helpfulness and harmlessness; I measured the analog: relevancy vs faithfulness.",
@@ -84,7 +84,7 @@ add_qs("opening", [
      ["Intended use: internal HR policy + AI guidebook Q&A on indexed PDFs.",
       "Failure modes: unsupported claims, over-abstention, wrong citation sources, vocabulary mismatch, incomplete enumeration lists, code hallucination.",
       "Mitigations: faithfulness guard, mandatory [Source N], balanced vs strict modes, hybrid BM25, corpus scoping, code validation pipeline, eval harness.",
-      "Known limits: 7B local model; guidebook faith 0.629 baseline (055058 tuning: 0.543); code bucket faith 0.25 on 055058; policy faith 0.807; CPU e2e p50 53.5s."],
+      "Known limits: 7B local model; guidebook faith 0.594 on run 101844 (055058 tuning: 0.543); code bucket faith 0.25 on 055058; policy faith 0.807; CPU e2e p50 53.5s."],
      "prompts.py, generation.py, README.md limitations", ["Residual risk?", "Human escalation path?"], "opening"),
 ])
 
@@ -106,7 +106,7 @@ add_qs("retrieval", [
       "Per-case: notice_resignation relevancy 0.0→0.80."],
      "query_processing.py augment_query_with_policy_terms", ["Why not HyDE?", "Embedding fine-tune?"], "retrieval"),
     ("Explain your chunking strategy.", "Indexing decisions for legal text.",
-     ["640 tokens, 64 overlap — section-aware SentenceSplitter.",
+     ["hierarchical 2000/480 tokens — section-aware SentenceSplitter.",
       "section_path + page_number + content_type metadata on every chunk.",
       "Incremental SHA-256 file_hash indexing into Chroma.",
       "308 chunks: 80 policy handbook + 228 AI Agents guidebook (0% unknown section_path post-reindex)."],
@@ -120,7 +120,7 @@ add_qs("retrieval", [
      ["is_comprehensive_list_query() + augment_query_with_guidebook_terms() for named subqueries.",
       "Multi-query retrieval, section-diverse rerank, top_n=12 for comprehensive path.",
       "Enumeration few-shots (Examples M–O) + rules 16b/16c in prompts.py.",
-      "Run 164848: full guidebook rel 0.700 (gate passed); enumeration bucket rel 0.84, hit 1.00."],
+      "Run 101844: guidebook rel 0.766, hit 0.886 (best); enumeration bucket rel 0.84, hit 1.00."],
      "query_processing.py, retriever.py, prompts.py", ["Why multi-query retrieval?", "How do you measure list completeness?"], "retrieval"),
     ("What is cross-corpus bleed and how did you fix it?", "Multi-corpus RAG pitfall — tests retrieval scoping design.",
      ["Shared Chroma collection indexed policy + guidebook; dense retrieval returned handbook chunks for guidebook questions.",
@@ -224,7 +224,7 @@ add_qs("production", [
     ("How did you productionize this?", "MLOps maturity for solo project.",
      ["Streamlit UI with index diagnostics; Docker Compose + host Ollama.",
       "entrypoint.sh: Ollama wait 60s, optional AUTO_INDEX_ON_START.",
-      "182 pytest tests; probe_chroma_index() for health.",
+      "222 pytest tests; probe_chroma_index() for health.",
       "Logs: app.log, citation pipeline, eval JSON, GenerationTrace."],
      "Dockerfile, docker/entrypoint.sh, app/streamlit_app.py", ["CI/CD?", "K8s?"], "production"),
     ("Tell me about the citation trust bug.", "Production battle story.",
@@ -262,10 +262,10 @@ add_qs("production", [
       "Streamlit binds 0.0.0.0 — required for port mapping."],
      "docker-compose.yml, .streamlit/config.toml", ["Ollama in-compose variant?", "Model versioning?"], "production"),
     ("What's missing for true production?", "Calibration — Anthropic values honesty.",
-     ["Phase 4 CI green on GitHub (run 27804469869): pytest + ci_eval_gate.py retrieval smoke.",
+     ["Phase 4 CI + Docker CD green (runs 27804469869, 27820859129): 222 pytest + ci_eval_gate.py smoke; image soubhagya007/rag-chatbot.",
       "No production drift monitoring; no ACL per user.",
       "Benchmarked p50/p95 on golden set (53.5s/58.8s e2e) — no live-traffic metrics yet; CPU-only default.",
-      "Faithfulness tuning dd40b86 (055058): faith 0.543 vs baseline 0.629; next: code/currency retrieval."],
+      "Faithfulness tuning dd40b86 (055058): faith 0.543 vs 0.594 baseline (101844); next: 5 weak code/abstention cases."],
      "README2 open items", ["First priority if hired?", "90-day roadmap?"], "production"),
 ])
 
@@ -524,7 +524,7 @@ SVG_TRADEOFF = '''<svg class="b3b-svg" viewBox="0 0 800 360" xmlns="http://www.w
 
 SVG_EVAL = '''<svg class="b3b-svg" viewBox="0 0 800 320" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="d3" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#fff" opacity="0.06"/></pattern><marker id="ar3" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#FFFF00"/></marker></defs><rect width="800" height="320" fill="#0c0e14"/><rect width="800" height="320" fill="url(#d3)"/><rect x="30" y="120" width="120" height="50" rx="8" fill="#58C4DD" fill-opacity="0.15" stroke="#58C4DD"/><text class="node-label" x="90" y="150" text-anchor="middle">Change</text><path class="flow-arrow" d="M150 145 L190 145" stroke="#FFFF00" stroke-width="2" marker-end="url(#ar3)"/><rect x="190" y="120" width="140" height="50" rx="8" fill="#83C167" fill-opacity="0.15" stroke="#83C167"/><text class="node-label" x="260" y="142" text-anchor="middle">evaluate.py</text><text class="node-sub" x="260" y="158" text-anchor="middle">60 cases</text><path class="flow-arrow" d="M330 145 L370 145" stroke="#FFFF00" stroke-width="2" marker-end="url(#ar3)"/><rect x="370" y="110" width="150" height="70" rx="8" fill="#FF862F" fill-opacity="0.15" stroke="#FF862F"/><text class="node-label" x="445" y="138" text-anchor="middle">LLM Judge</text><text class="node-sub" x="445" y="158" text-anchor="middle">faith + relv</text><path class="flow-arrow" d="M520 145 L560 145" stroke="#FFFF00" stroke-width="2" marker-end="url(#ar3)"/><rect x="560" y="120" width="200" height="50" rx="8" fill="#9A72AC" fill-opacity="0.15" stroke="#9A72AC"/><text class="node-label" x="660" y="150" text-anchor="middle">evaluation_results.json</text><path d="M660 170 C660 220, 90 220, 90 175" stroke="#58C4DD" stroke-width="1.5" stroke-dasharray="6 4" fill="none" marker-end="url(#ar3)"/><text font-family="IBM Plex Sans,sans-serif" font-size="10" fill="#FC6255" x="400" y="260" text-anchor="middle">Policy 091001: relv 0.40→0.747 · Guidebook 164848: rel 0.700</text></svg>'''
 
-SVG_GEN = '''<svg class="b3b-svg" viewBox="0 0 900 300" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="dg" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#fff" opacity="0.06"/></pattern><marker id="arg" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#FFFF00"/></marker></defs><rect width="900" height="300" fill="#0c0e14"/><rect width="900" height="300" fill="url(#dg)"/><rect x="20" y="110" width="130" height="56" rx="8" fill="#58C4DD" fill-opacity="0.15" stroke="#58C4DD"/><text class="node-label" x="85" y="135" text-anchor="middle">_gen_interview</text><text class="node-sub" x="85" y="152" text-anchor="middle">notes.py</text><path class="flow-arrow" d="M150 138 L185 138" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="185" y="110" width="120" height="56" rx="8" fill="#83C167" fill-opacity="0.15" stroke="#83C167"/><text class="node-label" x="245" y="142" text-anchor="middle">add_qs()</text><path class="flow-arrow" d="M305 138 L340 138" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="340" y="110" width="100" height="56" rx="8" fill="#FF862F" fill-opacity="0.15" stroke="#FF862F"/><text class="node-label" x="390" y="142" text-anchor="middle">q()</text><path class="flow-arrow" d="M440 138 L475 138" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="475" y="100" width="130" height="76" rx="8" fill="#9A72AC" fill-opacity="0.15" stroke="#9A72AC"/><text class="node-label" x="540" y="128" text-anchor="middle">f-string</text><text class="node-sub" x="540" y="148" text-anchor="middle">+ project-plans CSS</text><path class="flow-arrow" d="M605 125 C650 80, 700 55, 740 55" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><path class="flow-arrow" d="M605 152 C650 195, 700 220, 740 220" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="740" y="30" width="145" height="48" rx="8" fill="#83C167" fill-opacity="0.2" stroke="#83C167" stroke-width="2"/><text class="node-label" x="812" y="58" text-anchor="middle">interview-notes.html</text><rect x="740" y="195" width="145" height="48" rx="8" fill="#58C4DD" fill-opacity="0.2" stroke="#58C4DD" stroke-width="2"/><text class="node-label" x="812" y="223" text-anchor="middle">gen-interview-notes.html</text><text font-family="IBM Plex Sans,sans-serif" font-size="10" fill="rgba(255,255,255,0.4)" x="450" y="275" text-anchor="middle">49 questions · 8 categories · Anthropic solo AI/ML engineer focus</text></svg>'''
+SVG_GEN = '''<svg class="b3b-svg" viewBox="0 0 900 300" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="dg" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#fff" opacity="0.06"/></pattern><marker id="arg" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#FFFF00"/></marker></defs><rect width="900" height="300" fill="#0c0e14"/><rect width="900" height="300" fill="url(#dg)"/><rect x="20" y="110" width="130" height="56" rx="8" fill="#58C4DD" fill-opacity="0.15" stroke="#58C4DD"/><text class="node-label" x="85" y="135" text-anchor="middle">_gen_interview</text><text class="node-sub" x="85" y="152" text-anchor="middle">notes.py</text><path class="flow-arrow" d="M150 138 L185 138" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="185" y="110" width="120" height="56" rx="8" fill="#83C167" fill-opacity="0.15" stroke="#83C167"/><text class="node-label" x="245" y="142" text-anchor="middle">add_qs()</text><path class="flow-arrow" d="M305 138 L340 138" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="340" y="110" width="100" height="56" rx="8" fill="#FF862F" fill-opacity="0.15" stroke="#FF862F"/><text class="node-label" x="390" y="142" text-anchor="middle">q()</text><path class="flow-arrow" d="M440 138 L475 138" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="475" y="100" width="130" height="76" rx="8" fill="#9A72AC" fill-opacity="0.15" stroke="#9A72AC"/><text class="node-label" x="540" y="128" text-anchor="middle">f-string</text><text class="node-sub" x="540" y="148" text-anchor="middle">+ project-plans CSS</text><path class="flow-arrow" d="M605 125 C650 80, 700 55, 740 55" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><path class="flow-arrow" d="M605 152 C650 195, 700 220, 740 220" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="740" y="30" width="145" height="48" rx="8" fill="#83C167" fill-opacity="0.2" stroke="#83C167" stroke-width="2"/><text class="node-label" x="812" y="52" text-anchor="middle">interview-notes</text><text class="node-sub" x="812" y="68" text-anchor="middle">(repo root)</text><rect x="740" y="195" width="145" height="48" rx="8" fill="#58C4DD" fill-opacity="0.2" stroke="#58C4DD" stroke-width="2"/><text class="node-label" x="812" y="223" text-anchor="middle">gen-interview-notes.html</text><text font-family="IBM Plex Sans,sans-serif" font-size="10" fill="rgba(255,255,255,0.4)" x="450" y="275" text-anchor="middle">49 questions · 222 tests · run 101844 rel 0.766 · Docker CD green</text></svg>'''
 
 PITCH = """Employees need policy answers they can trust and verify — not confident hallucinations. As a solo AI/ML engineer, I built an evaluation-first RAG system across two corpora (308 chunks): hybrid BM25+dense retrieval, rerank, grounded generation, faithfulness guard, code validation, and citation-filtered UI. On the policy benchmark I recovered relevancy from 0.40 to 0.747 (+87%). On the guidebook track I passed the 35-case relevancy gate at 0.700 (run 164848) and shipped Phase 4 CI green on GitHub. Faithfulness prompt tuning (dd40b86) taught me prompt-only fixes are insufficient when retrieval misses code chunks — I measured that honestly (run 055058: faith 0.543) instead of hiding regressions."""
 
@@ -584,10 +584,10 @@ html = f'''<!DOCTYPE html>
         </div>
         <div class="hero-stats">
           <span class="stat-pill metric"><strong>0.747</strong> Policy Rel</span>
-          <span class="stat-pill metric"><strong>0.700</strong> Guidebook Rel</span>
+          <span class="stat-pill metric"><strong>0.766</strong> Guidebook Rel</span>
           <span class="stat-pill metric"><strong>0.84</strong> Enum Rel</span>
           <span class="stat-pill"><strong>308</strong> Chunks</span>
-          <span class="stat-pill"><strong>180</strong> Tests</span>
+          <span class="stat-pill"><strong>222</strong> Tests</span>
           <span class="stat-pill"><strong>60</strong> Golden Cases</span>
         </div>
       </header>
@@ -639,7 +639,7 @@ html = f'''<!DOCTYPE html>
           <p><strong>Purpose:</strong> PDF → section-enriched chunks → Chroma with incremental SHA-256 hashing.</p>
           <ul class="bullets">
             <li><code>build_index()</code>, <code>probe_chroma_index()</code>, <code>enrich_nodes_with_sections()</code></li>
-            <li>640/64 tokens; metadata: section_path, page_number, file_hash</li>
+            <li>hierarchical 2000/480 tokens; metadata: section_path, page_number, file_hash</li>
             <li><strong>Alt considered:</strong> fixed char splits — rejected (mid-clause legal splits)</li>
           </ul>
         </article>
@@ -691,7 +691,7 @@ html = f'''<!DOCTYPE html>
           <h4>Experimentation (policy + Track A runs)</h4>
           <ul class="bullets">
             <li>Policy: 13 runs — guard, few-shots, TOP_N=6, normalize_balanced_answer → 104356</li>
-            <li>Guidebook: re-index, code validation tuning (143246), corpus scope, enumeration (164848 rel 0.700)</li>
+            <li>Guidebook: re-index, code validation tuning (143246), corpus scope, topic pipelines (101844 rel 0.766)</li>
           </ul>
           <h4>Eval metrics</h4>
           <div class="table-wrap"><table>
@@ -713,8 +713,8 @@ html = f'''<!DOCTYPE html>
             <li><strong>Serving:</strong> Streamlit :8501; Docker Compose + host Ollama</li>
             <li><strong>Reliability:</strong> fail-open rewrite, reranker graceful degradation, probe_chroma_index(), citation score fallback capped</li>
             <li><strong>Observability:</strong> app.log, citation pipeline stages, eval JSON append-only</li>
-            <li><strong>Tests:</strong> 182 pytest across generation, citations, prompts, eval, chroma, code validation, retrieval scope</li>
-            <li><strong>Gaps (say honestly):</strong> guidebook faith 0.629 baseline (055058 tuning: 0.543); code/currency retrieval misses; no drift monitoring; golden-set e2e p50 53.5s, CPU-only default</li>
+            <li><strong>Tests:</strong> 222 pytest across generation, citations, prompts, eval, chroma, code validation, retrieval scope</li>
+            <li><strong>Gaps (say honestly):</strong> guidebook faith 0.594 on run 101844 (055058 tuning: 0.543); code/currency retrieval misses; no drift monitoring; golden-set e2e p50 53.5s, CPU-only default</li>
           </ul>
         </div>
       </section>
@@ -760,14 +760,14 @@ html = f'''<!DOCTYPE html>
           <tr class="highlight-row"><td>164848</td><td>Full guidebook post-enumeration</td><td>0.771</td><td>0.629</td><td class="high-score">0.700</td></tr>
           <tr><td>055058</td><td>Faithfulness prompt tuning (dd40b86)</td><td>0.800</td><td>0.543</td><td>0.666</td></tr>
         </table></div>
-        <p>Policy per-case: sick_leave relevancy 0.0→0.90. Guidebook: 0.629→0.700 on full 35-case run; enumeration bucket rel 0.84.</p>
+        <p>Policy per-case: sick_leave relevancy 0.0→0.90. Guidebook: 0.629→0.766 on full 35-case run (101844); enumeration bucket rel 0.84.</p>
       </section>
 
       <section id="s10">
         <h2>10. Future Improvements</h2>
         <ul class="bullets">
           <li>Phase 4 CI green on GitHub (run 27804469869); faithfulness tuning dd40b86 (055058)</li>
-          <li>Faithfulness ≥0.90 without relevancy loss — tighter generation, not more abstention (guidebook 0.629 today)</li>
+          <li>Faithfulness ≥0.90 without relevancy loss — tighter generation, not more abstention (guidebook 0.594 on run 101844)</li>
           <li>Independent Claude-as-judge; per-user ACL metadata filters; GPU latency path</li>
         </ul>
       </section>
@@ -828,10 +828,10 @@ html = f'''<!DOCTYPE html>
           <p>Solo production RAG with alignment-aware eval — workflow-first grounding system, not a notebook demo.</p>
           <h3>Weak areas (address honestly)</h3>
           <ul class="bullets">
-            <li>Guidebook faithfulness 0.629 vs 0.90 target; code-query rel 0.525 (run 164848)</li>
+            <li>Guidebook faithfulness 0.629 vs 0.90 target; code/currency cases still weak (run 101844)</li>
             <li>Policy faithfulness 0.807 vs 0.90 target on best balanced run</li>
             <li>7B local model limits; CPU e2e p50 53.5s; no production traffic metrics</li>
-            <li>LLM judge not independent from generator; guidebook faith 0.629 baseline (055058: 0.543)</li>
+            <li>LLM judge not independent from generator; guidebook faith 0.594 on run 101844 (055058: 0.543)</li>
           </ul>
           <h3 class="red-flag">Red flags to avoid</h3>
           <ul class="bullets">
@@ -850,7 +850,7 @@ html = f'''<!DOCTYPE html>
             <li><strong>Resolved:</strong> 5-case human overlap — faith κ@0.5 1.0, relv κ@0.5 0.0 (logs/human_judge_agreement.json)</li>
             <li><strong>Resolved:</strong> Git-derived timeline — ~0.5 weeks span, 13 eval runs in 5.4h (docs/project_timeline.json)</li>
             <li><strong>Resolved:</strong> Measured p50/p95 — e2e 53.5s / 58.8s on 5 golden cases (logs/latency_benchmark.json)</li>
-            <li><strong>Resolved:</strong> Hybrid BM25 shipped; corpus scoping; code validation 100% pass (143246); guidebook rel gate 0.700 (164848)</li>
+            <li><strong>Resolved:</strong> Hybrid BM25 shipped; corpus scoping; code validation 100% pass (143246); guidebook rel 0.766 (101844)</li>
             <li><strong>Remaining:</strong> Independent judge (Claude API); code/currency retrieval fixes; faithfulness recovery on guidebook</li>
           </ul>
         </div>
@@ -947,7 +947,7 @@ gen_html = f'''<!DOCTYPE html>
           <div class="file-pill"><strong>Input</strong><code>docs/_gen_interview_notes.py</code></div>
           <div class="file-pill out"><strong>Output A</strong><a href="interview-notes.html">interview-notes.html</a></div>
           <div class="file-pill out"><strong>Output B</strong><a href="gen-interview-notes.html">gen-interview-notes.html</a></div>
-          <div class="file-pill"><strong>CSS source</strong><code>project-plans.html</code></div>
+          <div class="file-pill"><strong>CSS source</strong><code>../../project-plans.html</code></div>
         </div>
       </header>
 
@@ -973,8 +973,8 @@ gen_html = f'''<!DOCTYPE html>
           <div class="cmd-box"><code>python docs/_gen_interview_notes.py</code></div>
           <ul class="bullets">
             <li>Edits question tuples in <code>add_qs("category", [...])</code> blocks</li>
-            <li>Re-reads base CSS from <code>project-plans.html</code> automatically</li>
-            <li>Overwrites <code>interview-notes.html</code> and <code>gen-interview-notes.html</code></li>
+            <li>Re-reads base CSS from repo-root <code>project-plans.html</code> automatically</li>
+            <li>Writes repo-root <code>../../interview-notes.html</code> and <code>docs/gen-interview-notes.html</code></li>
           </ul>
         </div>
       </section>

@@ -4,11 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#e4eaf4">
-  <title>Generator Docs — Interview Notes · Anthropic</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Rag-chatbot — Generator Docs · Interview Notes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-
-    :root {
+:root {
       --bg-base: #e4eaf4;
       --text-primary: #0f172a;
       --text-secondary: #334155;
@@ -40,7 +42,20 @@
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    html { scroll-behavior: smooth; }
+    html {
+      scroll-behavior: smooth;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    :focus:not(:focus-visible) {
+      outline: none;
+    }
 
     body {
       font-family: var(--font-sans);
@@ -164,7 +179,10 @@
       justify-content: center;
       width: 44px;
       height: 44px;
+      min-width: 44px;
+      min-height: 44px;
       border: 1px solid var(--glass-border-subtle);
+      touch-action: manipulation;
       border-radius: 12px;
       background: rgba(255, 255, 255, 0.5);
       cursor: pointer;
@@ -257,13 +275,18 @@
       align-items: center;
     }
 
-    .toc nav a:hover {
+    .toc nav a:hover,
+    .toc nav a.active {
       color: var(--accent);
       background: var(--accent-light);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border-color: var(--glass-border-subtle);
       box-shadow: var(--glass-inset);
+    }
+
+    .toc nav a.active {
+      font-weight: 600;
     }
 
     .toc nav .toc-section {
@@ -311,9 +334,9 @@
     }
 
     .hero-stats {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.75rem;
     }
 
     .stat-pill {
@@ -330,6 +353,7 @@
 
     .stat-pill strong { color: var(--accent); }
     .stat-pill.metric strong { color: var(--metric); }
+    .stat-pill.success strong { color: var(--success); }
 
     /* Section headings */
     section { margin-bottom: 3rem; }
@@ -530,6 +554,16 @@
       -webkit-backdrop-filter: var(--blur);
       border: 1px solid var(--glass-border);
       box-shadow: var(--glass-shadow), var(--glass-inset);
+      max-width: 100%;
+      position: relative;
+    }
+
+    .table-wrap.is-scrollable {
+      cursor: grab;
+    }
+
+    .table-wrap.is-scrollable:active {
+      cursor: grabbing;
     }
 
     .scroll-hint {
@@ -564,6 +598,12 @@
       padding: 0.75rem 1rem;
       border-bottom: 1px solid rgba(255, 255, 255, 0.25);
       color: var(--text-secondary);
+      vertical-align: top;
+    }
+
+    td:last-child {
+      min-width: 8rem;
+      word-break: break-word;
     }
 
     tr:last-child td { border-bottom: none; }
@@ -632,19 +672,29 @@
 
     .diagram-viewport {
       overflow-x: auto;
+      overflow-y: hidden;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior-x: contain;
       touch-action: pan-x pan-y;
+      max-width: 100%;
+      scrollbar-width: thin;
     }
 
     .diagram-viewport.tall .b3b-svg {
       min-width: 0;
       width: 100%;
+      max-width: 100%;
     }
 
     .diagram-viewport.wide .b3b-svg {
       min-width: 720px;
       width: 100%;
+    }
+
+    @media (max-width: 900px) {
+      .diagram-viewport.wide .b3b-svg {
+        min-width: 600px;
+      }
     }
 
     .b3b-svg {
@@ -782,6 +832,36 @@
 
     footer a:hover { text-decoration: underline; }
 
+    .back-to-top {
+      display: none;
+      position: fixed;
+      right: max(1rem, env(safe-area-inset-right));
+      bottom: max(1rem, env(safe-area-inset-bottom));
+      z-index: 180;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg-strong);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      box-shadow: var(--glass-shadow);
+      color: var(--accent);
+      font-size: 1.25rem;
+      line-height: 1;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+
+    .back-to-top.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
     /* Tablet */
     @media (max-width: 1024px) {
       main { padding: 2rem 1.75rem 3rem; }
@@ -846,11 +926,27 @@
 
       .hero .subtitle { font-size: 1rem; }
 
-      .hero-stats { gap: 0.6rem; }
+      .hero-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+      }
 
       .stat-pill {
-        font-size: 0.82rem;
-        padding: 0.45rem 0.9rem;
+        font-size: 0.8rem;
+        padding: 0.5rem 0.65rem;
+        text-align: center;
+        justify-content: center;
+        border-radius: 12px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+      }
+
+      .back-to-top { display: flex; align-items: center; justify-content: center; }
+
+      footer p {
+        word-break: break-word;
+        line-height: 1.75;
       }
 
       .card { padding: 1.25rem; }
@@ -899,7 +995,7 @@
 
       table {
         font-size: 0.82rem;
-        min-width: 36rem;
+        min-width: 32rem;
       }
       th, td { padding: 0.65rem 0.75rem; }
     }
@@ -924,7 +1020,7 @@
 
       ol.steps, ul.files { margin-left: 1rem; }
 
-      .diagram-viewport.wide .b3b-svg { min-width: 640px; }
+      .diagram-viewport.wide .b3b-svg { min-width: 520px; }
 
       h3 { font-size: 1.2rem; }
     }
@@ -936,7 +1032,7 @@
     }
 
     @media print {
-      .liquid-bg, .mobile-header, .toc-backdrop { display: none !important; }
+      .liquid-bg, .mobile-header, .toc-backdrop, .back-to-top { display: none !important; }
       .toc { display: none; }
       .layout { grid-template-columns: 1fr; }
       .card, .hero, .diagram-card { break-inside: avoid; background: white; box-shadow: none; }
@@ -975,13 +1071,38 @@
     .step-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 1rem 0; }
     .step-chip { padding: 0.4rem 0.85rem; background: rgba(255,255,255,0.5); border: 1px solid var(--glass-border); border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
     .step-arrow { color: var(--accent); font-weight: 700; }
+    .gen-hero-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 0.65rem;
+      margin-top: 1.25rem;
+    }
+
+    @media (max-width: 900px) {
+      .gen-hero-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .file-grid { grid-template-columns: 1fr 1fr; }
+      .step-row { gap: 0.35rem; }
+    }
+
+    @media (max-width: 480px) {
+      .file-grid { grid-template-columns: 1fr; }
+      .src-cat { margin-left: 0; width: 100%; order: 3; }
+      .source-card summary { gap: 0.35rem; }
+      .step-row { flex-direction: column; align-items: stretch; }
+      .step-arrow { display: none; }
+      .step-chip { text-align: center; }
+      .code-panel { font-size: 0.72rem; }
+    }
 
   </style>
 </head>
+
 <body>
   <div class="liquid-bg" aria-hidden="true"><div class="blob blob-1"></div><div class="blob blob-2"></div><div class="blob blob-3"></div><div class="blob blob-4"></div></div>
   <header class="mobile-header">
-    <button class="menu-toggle" id="menu-toggle" type="button" aria-label="Open navigation"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <button class="menu-toggle" id="menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="toc-panel"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     <span class="mobile-header-title">Generator Docs</span>
   </header>
   <div class="toc-backdrop" id="toc-backdrop"></div>
@@ -1003,12 +1124,20 @@
       <header class="hero gen-hero" id="g1">
         <span class="anthropic-badge">Source of Truth · Solo AI/ML Engineer</span>
         <h1>Interview Notes Generator</h1>
-        <p class="subtitle">Python source → premium HTML/CSS · 49 Anthropic-weighted questions · liquid glass theme from project-plans.</p>
+        <p class="subtitle">Python source → premium HTML/CSS · 49 Anthropic-weighted questions · synced with repo-root interview-notes.html · liquid glass theme from project-plans.</p>
         <div class="file-grid">
           <div class="file-pill"><strong>Input</strong><code>docs/_gen_interview_notes.py</code></div>
           <div class="file-pill out"><strong>Output A</strong><a href="../../interview-notes.html">interview-notes.html</a></div>
           <div class="file-pill out"><strong>Output B</strong><a href="gen-interview-notes.html">gen-interview-notes.html</a></div>
-          <div class="file-pill"><strong>CSS source</strong><code>project-plans.html</code></div>
+          <div class="file-pill"><strong>CSS source</strong><code>../../project-plans.html</code></div>
+        </div>
+        <div class="gen-hero-stats hero-stats">
+          <span class="stat-pill metric"><strong>0.747</strong> Policy Rel</span>
+          <span class="stat-pill metric success"><strong>0.766</strong> Guidebook Rel</span>
+          <span class="stat-pill metric success"><strong>0.886</strong> Hit Rate</span>
+          <span class="stat-pill"><strong>222</strong> Tests</span>
+          <span class="stat-pill success"><strong>CD</strong> Docker Green</span>
+          <span class="stat-pill"><strong>49</strong> Questions</span>
         </div>
       </header>
 
@@ -1016,7 +1145,7 @@
         <h2>2. Generation Pipeline</h2>
         <p class="scroll-hint">← Swipe diagram →</p>
         <div class="diagram-card b3b">
-          <div class="diagram-viewport wide"><svg class="b3b-svg" viewBox="0 0 900 300" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="dg" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#fff" opacity="0.06"/></pattern><marker id="arg" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#FFFF00"/></marker></defs><rect width="900" height="300" fill="#0c0e14"/><rect width="900" height="300" fill="url(#dg)"/><rect x="20" y="110" width="130" height="56" rx="8" fill="#58C4DD" fill-opacity="0.15" stroke="#58C4DD"/><text class="node-label" x="85" y="135" text-anchor="middle">_gen_interview</text><text class="node-sub" x="85" y="152" text-anchor="middle">notes.py</text><path class="flow-arrow" d="M150 138 L185 138" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="185" y="110" width="120" height="56" rx="8" fill="#83C167" fill-opacity="0.15" stroke="#83C167"/><text class="node-label" x="245" y="142" text-anchor="middle">add_qs()</text><path class="flow-arrow" d="M305 138 L340 138" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="340" y="110" width="100" height="56" rx="8" fill="#FF862F" fill-opacity="0.15" stroke="#FF862F"/><text class="node-label" x="390" y="142" text-anchor="middle">q()</text><path class="flow-arrow" d="M440 138 L475 138" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="475" y="100" width="130" height="76" rx="8" fill="#9A72AC" fill-opacity="0.15" stroke="#9A72AC"/><text class="node-label" x="540" y="128" text-anchor="middle">f-string</text><text class="node-sub" x="540" y="148" text-anchor="middle">+ project-plans CSS</text><path class="flow-arrow" d="M605 125 C650 80, 700 55, 740 55" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><path class="flow-arrow" d="M605 152 C650 195, 700 220, 740 220" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="740" y="30" width="145" height="48" rx="8" fill="#83C167" fill-opacity="0.2" stroke="#83C167" stroke-width="2"/><text class="node-label" x="812" y="58" text-anchor="middle">interview-notes.html</text><rect x="740" y="195" width="145" height="48" rx="8" fill="#58C4DD" fill-opacity="0.2" stroke="#58C4DD" stroke-width="2"/><text class="node-label" x="812" y="223" text-anchor="middle">gen-interview-notes.html</text><text font-family="IBM Plex Sans,sans-serif" font-size="10" fill="rgba(255,255,255,0.4)" x="450" y="275" text-anchor="middle">49 questions · 8 categories · Anthropic solo AI/ML engineer focus</text></svg></div>
+          <div class="diagram-viewport wide"><svg class="b3b-svg" viewBox="0 0 900 300" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="dg" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#fff" opacity="0.06"/></pattern><marker id="arg" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#FFFF00"/></marker></defs><rect width="900" height="300" fill="#0c0e14"/><rect width="900" height="300" fill="url(#dg)"/><rect x="20" y="110" width="130" height="56" rx="8" fill="#58C4DD" fill-opacity="0.15" stroke="#58C4DD"/><text class="node-label" x="85" y="135" text-anchor="middle">_gen_interview</text><text class="node-sub" x="85" y="152" text-anchor="middle">notes.py</text><path class="flow-arrow" d="M150 138 L185 138" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="185" y="110" width="120" height="56" rx="8" fill="#83C167" fill-opacity="0.15" stroke="#83C167"/><text class="node-label" x="245" y="142" text-anchor="middle">add_qs()</text><path class="flow-arrow" d="M305 138 L340 138" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="340" y="110" width="100" height="56" rx="8" fill="#FF862F" fill-opacity="0.15" stroke="#FF862F"/><text class="node-label" x="390" y="142" text-anchor="middle">q()</text><path class="flow-arrow" d="M440 138 L475 138" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="475" y="100" width="130" height="76" rx="8" fill="#9A72AC" fill-opacity="0.15" stroke="#9A72AC"/><text class="node-label" x="540" y="128" text-anchor="middle">f-string</text><text class="node-sub" x="540" y="148" text-anchor="middle">+ project-plans CSS</text><path class="flow-arrow" d="M605 125 C650 80, 700 55, 740 55" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><path class="flow-arrow" d="M605 152 C650 195, 700 220, 740 220" stroke="#FFFF00" stroke-width="2" marker-end="url(#arg)"/><rect x="740" y="30" width="145" height="48" rx="8" fill="#83C167" fill-opacity="0.2" stroke="#83C167" stroke-width="2"/><text class="node-label" x="812" y="52" text-anchor="middle">interview-notes</text><text class="node-sub" x="812" y="68" text-anchor="middle">(repo root)</text><rect x="740" y="195" width="145" height="48" rx="8" fill="#58C4DD" fill-opacity="0.2" stroke="#58C4DD" stroke-width="2"/><text class="node-label" x="812" y="223" text-anchor="middle">gen-interview-notes.html</text><text font-family="IBM Plex Sans,sans-serif" font-size="10" fill="rgba(255,255,255,0.4)" x="450" y="275" text-anchor="middle">49 questions · 222 tests · run 101844 rel 0.766 · Docker CD green</text></svg></div>
         </div>
         <div class="step-row">
           <span class="step-chip">add_qs tuples</span><span class="step-arrow">→</span>
@@ -1034,8 +1163,8 @@
           <div class="cmd-box"><code>python docs/_gen_interview_notes.py</code></div>
           <ul class="bullets">
             <li>Edits question tuples in <code>add_qs("category", [...])</code> blocks</li>
-            <li>Re-reads base CSS from <code>project-plans.html</code> automatically</li>
-            <li>Overwrites <code>interview-notes.html</code> and <code>gen-interview-notes.html</code></li>
+            <li>Re-reads base CSS from repo-root <code>project-plans.html</code> automatically</li>
+            <li>Writes repo-root <code>../../interview-notes.html</code> and <code>docs/gen-interview-notes.html</code></li>
           </ul>
         </div>
       </section>
@@ -1070,7 +1199,7 @@
   <div class="src-body">
     <div class="src-field"><span class="src-label">Category key</span><code>opening</code></div>
     <div class="src-field"><span class="src-label">Why they ask</span><p>Tests communication clarity and whether you lead with impact or buzzwords.</p></div>
-    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>Employees need handbook answers they can trust — not confident hallucinations.</li><li>I built an eval-driven RAG: dual-corpus index (308 chunks) → hybrid BM25+dense → rerank → grounded generation → faithfulness guard → code validation → citation-filtered UI.</li><li>As solo AI/ML engineer I owned pipeline, eval harness, UI, Docker, and 180 tests.</li><li>Policy: relevancy 0.40→0.747 (+87%) on 15-case set (run 104356). Guidebook: full rel 0.700 (run 164848, gate passed); enumeration rel 0.84—measured faithfulness/helpfulness trade-off explicitly.</li></ul></div>
+    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>Employees need handbook answers they can trust — not confident hallucinations.</li><li>I built an eval-driven RAG: dual-corpus index (308 chunks) → hybrid BM25+dense → rerank → grounded generation → faithfulness guard → code validation → citation-filtered UI.</li><li>As solo AI/ML engineer I owned pipeline, eval harness, UI, Docker, and 222 tests.</li><li>Policy: relevancy 0.40→0.747 (+87%) on 15-case set (run 104356). Guidebook: rel 0.766, hit 0.886 (run 101844, exceeds gate); enumeration rel 0.84—measured faithfulness/helpfulness trade-off explicitly.</li></ul></div>
     <div class="src-field"><span class="src-label">Code reference</span><code>README2.md, src/evaluation.py</code></div>
     <div class="src-field"><span class="src-label">Follow-ups</span><ul class="src-follow"><li>What would you do differently?</li><li>Biggest failure?</li></ul></div>
   </div>
@@ -1114,7 +1243,7 @@
   <div class="src-body">
     <div class="src-field"><span class="src-label">Category key</span><code>opening</code></div>
     <div class="src-field"><span class="src-label">Why they ask</span><p>Tests safety documentation thinking.</p></div>
-    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>Intended use: internal HR policy + AI guidebook Q&amp;A on indexed PDFs.</li><li>Failure modes: unsupported claims, over-abstention, wrong citation sources, vocabulary mismatch, incomplete enumeration lists, code hallucination.</li><li>Mitigations: faithfulness guard, mandatory [Source N], balanced vs strict modes, hybrid BM25, corpus scoping, code validation pipeline, eval harness.</li><li>Known limits: 7B local model; guidebook faith 0.629 baseline (055058 tuning: 0.543); code bucket faith 0.25 on 055058; policy faith 0.807; CPU e2e p50 53.5s.</li></ul></div>
+    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>Intended use: internal HR policy + AI guidebook Q&amp;A on indexed PDFs.</li><li>Failure modes: unsupported claims, over-abstention, wrong citation sources, vocabulary mismatch, incomplete enumeration lists, code hallucination.</li><li>Mitigations: faithfulness guard, mandatory [Source N], balanced vs strict modes, hybrid BM25, corpus scoping, code validation pipeline, eval harness.</li><li>Known limits: 7B local model; guidebook faith 0.594 on run 101844 (055058 tuning: 0.543); code bucket faith 0.25 on 055058; policy faith 0.807; CPU e2e p50 53.5s.</li></ul></div>
     <div class="src-field"><span class="src-label">Code reference</span><code>prompts.py, generation.py, README.md limitations</code></div>
     <div class="src-field"><span class="src-label">Follow-ups</span><ul class="src-follow"><li>Residual risk?</li><li>Human escalation path?</li></ul></div>
   </div>
@@ -1158,7 +1287,7 @@
   <div class="src-body">
     <div class="src-field"><span class="src-label">Category key</span><code>retrieval</code></div>
     <div class="src-field"><span class="src-label">Why they ask</span><p>Indexing decisions for legal text.</p></div>
-    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>640 tokens, 64 overlap — section-aware SentenceSplitter.</li><li>section_path + page_number + content_type metadata on every chunk.</li><li>Incremental SHA-256 file_hash indexing into Chroma.</li><li>308 chunks: 80 policy handbook + 228 AI Agents guidebook (0% unknown section_path post-reindex).</li></ul></div>
+    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>hierarchical 2000/480 tokens — section-aware SentenceSplitter.</li><li>section_path + page_number + content_type metadata on every chunk.</li><li>Incremental SHA-256 file_hash indexing into Chroma.</li><li>308 chunks: 80 policy handbook + 228 AI Agents guidebook (0% unknown section_path post-reindex).</li></ul></div>
     <div class="src-field"><span class="src-label">Code reference</span><code>indexing.py get_node_parser, enrich_nodes_with_sections</code></div>
     <div class="src-field"><span class="src-label">Follow-ups</span><ul class="src-follow"><li>Chunk size ablation?</li><li>Multi-doc?</li></ul></div>
   </div>
@@ -1180,7 +1309,7 @@
   <div class="src-body">
     <div class="src-field"><span class="src-label">Category key</span><code>retrieval</code></div>
     <div class="src-field"><span class="src-label">Why they ask</span><p>List completeness is a distinct failure mode from single-fact QA.</p></div>
-    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>is_comprehensive_list_query() + augment_query_with_guidebook_terms() for named subqueries.</li><li>Multi-query retrieval, section-diverse rerank, top_n=12 for comprehensive path.</li><li>Enumeration few-shots (Examples M–O) + rules 16b/16c in prompts.py.</li><li>Run 164848: full guidebook rel 0.700 (gate passed); enumeration bucket rel 0.84, hit 1.00.</li></ul></div>
+    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>is_comprehensive_list_query() + augment_query_with_guidebook_terms() for named subqueries.</li><li>Multi-query retrieval, section-diverse rerank, top_n=12 for comprehensive path.</li><li>Enumeration few-shots (Examples M–O) + rules 16b/16c in prompts.py.</li><li>Run 101844: guidebook rel 0.766, hit 0.886 (best); enumeration bucket rel 0.84, hit 1.00.</li></ul></div>
     <div class="src-field"><span class="src-label">Code reference</span><code>query_processing.py, retriever.py, prompts.py</code></div>
     <div class="src-field"><span class="src-label">Follow-ups</span><ul class="src-follow"><li>Why multi-query retrieval?</li><li>How do you measure list completeness?</li></ul></div>
   </div>
@@ -1367,7 +1496,7 @@
   <div class="src-body">
     <div class="src-field"><span class="src-label">Category key</span><code>production</code></div>
     <div class="src-field"><span class="src-label">Why they ask</span><p>MLOps maturity for solo project.</p></div>
-    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>Streamlit UI with index diagnostics; Docker Compose + host Ollama.</li><li>entrypoint.sh: Ollama wait 60s, optional AUTO_INDEX_ON_START.</li><li>182 pytest tests; probe_chroma_index() for health.</li><li>Logs: app.log, citation pipeline, eval JSON, GenerationTrace.</li></ul></div>
+    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>Streamlit UI with index diagnostics; Docker Compose + host Ollama.</li><li>entrypoint.sh: Ollama wait 60s, optional AUTO_INDEX_ON_START.</li><li>222 pytest tests; probe_chroma_index() for health.</li><li>Logs: app.log, citation pipeline, eval JSON, GenerationTrace.</li></ul></div>
     <div class="src-field"><span class="src-label">Code reference</span><code>Dockerfile, docker/entrypoint.sh, app/streamlit_app.py</code></div>
     <div class="src-field"><span class="src-label">Follow-ups</span><ul class="src-follow"><li>CI/CD?</li><li>K8s?</li></ul></div>
   </div>
@@ -1444,7 +1573,7 @@
   <div class="src-body">
     <div class="src-field"><span class="src-label">Category key</span><code>production</code></div>
     <div class="src-field"><span class="src-label">Why they ask</span><p>Calibration — Anthropic values honesty.</p></div>
-    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>Phase 4 CI green on GitHub (run 27804469869): pytest + ci_eval_gate.py retrieval smoke.</li><li>No production drift monitoring; no ACL per user.</li><li>Benchmarked p50/p95 on golden set (53.5s/58.8s e2e) — no live-traffic metrics yet; CPU-only default.</li><li>Faithfulness tuning dd40b86 (055058): faith 0.543 vs baseline 0.629; next: code/currency retrieval.</li></ul></div>
+    <div class="src-field"><span class="src-label">Answer outline</span><ul><li>Phase 4 CI + Docker CD green (runs 27804469869, 27820859129): 222 pytest + ci_eval_gate.py smoke; image soubhagya007/rag-chatbot.</li><li>No production drift monitoring; no ACL per user.</li><li>Benchmarked p50/p95 on golden set (53.5s/58.8s e2e) — no live-traffic metrics yet; CPU-only default.</li><li>Faithfulness tuning dd40b86 (055058): faith 0.543 vs 0.594 baseline (101844); next: 5 weak code/abstention cases.</li></ul></div>
     <div class="src-field"><span class="src-label">Code reference</span><code>README2 open items</code></div>
     <div class="src-field"><span class="src-label">Follow-ups</span><ul class="src-follow"><li>First priority if hired?</li><li>90-day roadmap?</li></ul></div>
   </div>
@@ -1637,22 +1766,134 @@ html = f'''...{{QB_OPENING}}...{{len(QUESTIONS)}} questions...'''</div>
       </section>
 
       <footer>
-        <p><strong>Company Policy RAG</strong> — Generator Documentation<br>
-        <a href="../../interview-notes.html">Interview Notes</a> · <a href="../../project-plans.html">Engineering Plans</a> · <a href="https://github.com/SoubhagyaJain/Rag-chatbot">GitHub</a></p>
+        <p>
+          <strong>Rag-chatbot</strong> — Interview Notes Generator Docs · Updated 2026-06-19<br>
+          <a href="../../README.md">Repo README</a> ·
+          <a href="../../interview-notes.html">Interview Notes</a> ·
+          <a href="../../project-plans.html">Engineering Plans</a> ·
+          <a href="../../company_policy_rag/README3.md">README3</a> ·
+          Docker Hub: <a href="https://hub.docker.com/r/soubhagya007/rag-chatbot" target="_blank" rel="noopener">soubhagya007/rag-chatbot</a> ·
+          GitHub: <a href="https://github.com/SoubhagyaJain/Rag-chatbot" target="_blank" rel="noopener">SoubhagyaJain/Rag-chatbot</a>
+        </p>
       </footer>
     </main>
   </div>
+  <button type="button" class="back-to-top" id="back-to-top" aria-label="Back to top" title="Back to top">↑</button>
+
   <script>
-    (function(){{
-      var t=document.getElementById('menu-toggle'),c=document.getElementById('toc-close'),p=document.getElementById('toc-panel'),b=document.getElementById('toc-backdrop');
-      function openM(){{p.classList.add('open');b.classList.add('visible');document.body.classList.add('menu-open');t.setAttribute('aria-expanded','true');}}
-      function closeM(){{p.classList.remove('open');b.classList.remove('visible');document.body.classList.remove('menu-open');t.setAttribute('aria-expanded','false');}}
-      if(t)t.onclick=function(){{p.classList.contains('open')?closeM():openM();}};
-      if(c)c.onclick=closeM; if(b)b.onclick=closeM;
-      document.querySelectorAll('#toc-panel nav a').forEach(function(a){{a.onclick=function(){{if(window.matchMedia('(max-width:900px)').matches)closeM();}};}});
-      document.getElementById('expand-src').onclick=function(){{document.querySelectorAll('.source-card').forEach(function(d){{d.open=true;}});}};
-      document.getElementById('collapse-src').onclick=function(){{document.querySelectorAll('.source-card').forEach(function(d){{d.open=false;}});}};
-    }})();
+    (function () {
+      var toggle = document.getElementById('menu-toggle');
+      var closeBtn = document.getElementById('toc-close');
+      var panel = document.getElementById('toc-panel');
+      var backdrop = document.getElementById('toc-backdrop');
+      var backToTop = document.getElementById('back-to-top');
+      var links = panel ? panel.querySelectorAll('nav a[href^="#"]') : [];
+      var mobileMq = window.matchMedia('(max-width: 900px)');
+
+      function isMobile() { return mobileMq.matches; }
+
+      function openMenu() {
+        if (!panel) return;
+        panel.classList.add('open');
+        backdrop.classList.add('visible');
+        backdrop.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('menu-open');
+        if (toggle) {
+          toggle.setAttribute('aria-expanded', 'true');
+          toggle.setAttribute('aria-label', 'Close navigation');
+        }
+      }
+
+      function closeMenu() {
+        if (!panel) return;
+        panel.classList.remove('open');
+        backdrop.classList.remove('visible');
+        backdrop.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('menu-open');
+        if (toggle) {
+          toggle.setAttribute('aria-expanded', 'false');
+          toggle.setAttribute('aria-label', 'Open navigation');
+        }
+      }
+
+      if (toggle) {
+        toggle.addEventListener('click', function () {
+          panel.classList.contains('open') ? closeMenu() : openMenu();
+        });
+      }
+      if (closeBtn) closeBtn.addEventListener('click', closeMenu);
+      if (backdrop) backdrop.addEventListener('click', closeMenu);
+
+      links.forEach(function (link) {
+        link.addEventListener('click', function () {
+          if (isMobile()) closeMenu();
+        });
+      });
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && panel && panel.classList.contains('open')) closeMenu();
+      });
+
+      function onBreakpointChange() {
+        if (!isMobile() && panel && panel.classList.contains('open')) closeMenu();
+      }
+      if (mobileMq.addEventListener) mobileMq.addEventListener('change', onBreakpointChange);
+      else if (mobileMq.addListener) mobileMq.addListener(onBreakpointChange);
+      window.addEventListener('resize', onBreakpointChange);
+
+      function refreshScrollableTables() {
+        document.querySelectorAll('.table-wrap').forEach(function (wrap) {
+          var scrollable = wrap.scrollWidth > wrap.clientWidth + 2;
+          wrap.classList.toggle('is-scrollable', scrollable);
+        });
+      }
+      refreshScrollableTables();
+      window.addEventListener('resize', refreshScrollableTables);
+      window.addEventListener('load', refreshScrollableTables);
+
+      var sections = [];
+      links.forEach(function (link) {
+        var id = link.getAttribute('href');
+        if (!id || id.charAt(0) !== '#') return;
+        var el = document.querySelector(id);
+        if (el) sections.push({ link: link, el: el });
+      });
+
+      function updateActiveLink() {
+        var marker = isMobile() ? 120 : 80;
+        var current = sections[0] || null;
+        sections.forEach(function (s) {
+          if (s.el.getBoundingClientRect().top <= marker) current = s;
+        });
+        sections.forEach(function (s) {
+          s.link.classList.toggle('active', s === current);
+        });
+      }
+      if (sections.length) {
+        window.addEventListener('scroll', updateActiveLink, { passive: true });
+        window.addEventListener('resize', updateActiveLink);
+        updateActiveLink();
+      }
+
+      if (backToTop) {
+        backToTop.addEventListener('click', function () {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+        window.addEventListener('scroll', function () {
+          backToTop.classList.toggle('visible', window.scrollY > 480);
+        }, { passive: true });
+      }
+
+      var expandSrc = document.getElementById('expand-src');
+      if (expandSrc) expandSrc.addEventListener('click', function () {
+        document.querySelectorAll('.source-card').forEach(function (d) { d.open = true; });
+      });
+      var collapseSrc = document.getElementById('collapse-src');
+      if (collapseSrc) collapseSrc.addEventListener('click', function () {
+        document.querySelectorAll('.source-card').forEach(function (d) { d.open = false; });
+      });
+    })();
   </script>
+
 </body>
 </html>
