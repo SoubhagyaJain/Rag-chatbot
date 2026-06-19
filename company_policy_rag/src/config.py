@@ -165,6 +165,11 @@ class Settings(BaseSettings):
     faithfulness_guard_mode: Literal["strict", "balanced", "off"] = Field(
         default="balanced", alias="FAITHFULNESS_GUARD_MODE"
     )
+    # keep: preserve answer on guard reject (relevancy-safe); trim: remove unsupported claims;
+    # abstain: replace with insufficient-info (strict-audit only — collapses relevancy)
+    faithfulness_guard_reject_action: Literal["keep", "trim", "abstain"] = Field(
+        default="keep", alias="FAITHFULNESS_GUARD_REJECT_ACTION"
+    )
 
     # ── Code validation (Phase 3) ──────────────────────────────────────────
     enable_code_validation: bool = Field(default=True, alias="ENABLE_CODE_VALIDATION")

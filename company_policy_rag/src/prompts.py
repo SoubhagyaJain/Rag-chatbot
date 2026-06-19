@@ -125,6 +125,60 @@ Question: What roles can sub-agents play in orchestration?
 Excerpt [Source 1]: Research Agent searches and retrieves relevant data.
 Bad answer: Lists "Filtering Agent" and "Code Executor Agent" when those names do not appear in the excerpts.
 Why bad: List only roles/patterns explicitly named in the excerpts — do not invent archetypes.
+
+### Example P — GOOD (pattern disambiguation — ReAct only)
+Question: What is the ReAct pattern?
+Excerpt [Source 1]: "ReAct (Reason and Act) combines reflection and tool use — Thought → Action → Observation loop."
+Answer: Based on the available information in the documents, ReAct (Reason and Act) combines reflection and tool use in a Thought → Action → Observation loop [Source 1]. The excerpts do not separately define a Reflection pattern.
+
+### Example Q — BAD (pattern conflation) — NEVER DO THIS
+Question: How does reflection help agents improve their output?
+Excerpt [Source 1]: ReAct combines reflection and tool use in a Thought → Action → Observation loop.
+Bad answer: Describes a standalone "Reflection pattern" with self-evaluation steps not named in the excerpts.
+Why bad: Do not invent a separate pattern — describe only what the excerpts say about reflection, and note if a dedicated reflection section is absent.
+
+### Example R — GOOD (Agent vs LLM vs RAG — excerpt-bound)
+Question: What is the difference between an Agent, an LLM, and RAG?
+Excerpt [Source 1]: "An LLM reasons from training data; agents add autonomy and tool use; RAG retrieves external context for the LLM."
+Answer: Based on the available information in the documents, an LLM reasons from its training data [Source 1]. Agents add autonomy, tool use, and workflow decisions [Source 1]. RAG retrieves external context to augment the LLM [Source 1].
+
+### Example S — BAD (acronym expansion) — NEVER DO THIS
+Question: What is MCP in the context of agent tools?
+Excerpt [Source 1]: "We set up an MCP server for the financial analyst crew."
+Bad answer: "MCP stands for Multi-Agent Control Panel..."
+Why bad: Never expand acronyms unless the excerpt defines them — quote how the excerpt uses MCP.
+
+### Example T — GOOD (named agent roles only)
+Question: What does a manager agent do in a multi-agent setup?
+Excerpt [Source 1]: CrewAI orchestrates web search, research analyst, and technical writer agents.
+Answer: Based on the available information in the documents, the excerpts describe CrewAI orchestrating specialized agents such as web search, research analyst, and technical writer agents [Source 1]. The excerpts do not mention a "manager agent" role by name.
+
+### Example U — GOOD (building blocks from headings only)
+Question: List and explain the 6 building blocks of AI Agents.
+Excerpt [Source 1]: "1. Role-playing … 2. Tools … 3. Memory … 4. Guardrails … 5. Planning … 6. Focus/Tasks"
+Answer: Based on the available information in the documents:
+1. Role-playing — [brief excerpt wording] [Source 1].
+2. Tools — [brief excerpt wording] [Source 1].
+(continue only for headings present in excerpts)
+The excerpts do not fully describe every building block in detail.
+
+### Example V — BAD (invented URLs) — NEVER DO THIS
+Question: Where does the guidebook point readers for full code examples?
+Excerpt [Source 1]: "Check this out — Browserbase tool walkthrough."
+Bad answer: Lists github.com/... links not present in the excerpt.
+Why bad: URLs must appear verbatim in excerpts.
+
+### Example W — BAD (invented memory taxonomy) — NEVER DO THIS
+Question: What types of memory do agents use?
+Excerpt [Source 1]: "Memory is one of the six building blocks."
+Bad answer: "1. Short-term memory … 2. Long-term memory …"
+Why bad: Do not introduce memory subtypes unless the excerpts name them.
+
+### Example X — BAD (manager agent in sub-agent list) — NEVER DO THIS
+Question: What roles can sub-agents play in orchestration?
+Excerpt [Source 1]: "Research agent gathers data; writer agent drafts output."
+Bad answer: Adds "Manager agent coordinates the crew" when manager is not named.
+Why bad: List only agent roles verbatim in excerpts — never add coordinator/manager archetypes.
 """
 
 FEW_SHOT_CODE_BALANCED = """
@@ -146,6 +200,29 @@ def convert_currency(amount, from_curr, to_curr):
 Question: Show the currency conversion tool example.
 Bad answer includes `def fetch_forex_api()` or renames functions not present in the excerpt.
 Why bad: Every code line must appear in the retrieved context — do not invent or complete partial snippets.
+
+### Example M2 — GOOD (custom tools — excerpt examples only)
+Question: How do you build custom tools for an agent?
+Excerpt [Source 1]: "def search_hotels(query): ..." and "The agent calls search_hotels via the tool interface."
+Answer: Based on the available information in the documents, custom tools are implemented as functions such as:
+```python
+def search_hotels(query):
+    ...
+```
+[Source 1]
+The agent invokes tools through the tool interface shown in the excerpt [Source 1]. The excerpts do not provide a general step-by-step tutorial beyond these examples.
+
+### Example N2 — BAD (claiming code absent when present) — NEVER DO THIS
+Question: Show the currency conversion tool example.
+Excerpt [Source 1]: "def convert_currency(amount, from_curr, to_curr): ..."
+Bad answer: "There is no currency conversion tool in the excerpts."
+Why bad: Search all excerpts for code blocks before claiming absence — copy matching code verbatim when found.
+
+### Example O2 — BAD (invented invocation) — NEVER DO THIS
+Question: Show the currency conversion tool example and explain how it is invoked.
+Excerpt [Source 1]: def convert_currency(...) only — no call site shown.
+Bad answer: "Call convert_currency(100, 'USD', 'EUR') via agent.run_tool(...)"
+Why bad: Do not invent call syntax or APIs — state that invocation details are not shown in the excerpts.
 """
 
 # ── Strict generation prompts ────────────────────────────────────────────────
@@ -234,7 +311,26 @@ BALANCED_TEXT_QA_PROMPT_TMPL = (
     "quote the excerpt's wording instead of outside knowledge.\n"
     "18. Do not invent examples. Use excerpt examples only, or state that no example was provided.\n"
     "19. When showing code, copy lines exactly from excerpts; do not paraphrase, rename functions, "
-    "or complete partial snippets. If code is incomplete in the excerpts, say so.\n\n"
+    "or complete partial snippets. If code is incomplete in the excerpts, say so.\n"
+    "19b. Before claiming code or an example is absent, scan ALL excerpts for matching function "
+    "names or code blocks. For invocation questions, describe only call patterns shown in excerpts; "
+    "if no call site appears, say invocation details are not shown.\n"
+    "20. For named patterns (ReAct, reflection, plan-and-execute, etc.), describe ONLY that "
+    "pattern using excerpt wording. Do NOT attribute properties of one pattern to another or "
+    "invent a standalone pattern section when excerpts only mention it inside another pattern.\n"
+    "21. For workflow / 'how does X work' questions, use step language ONLY when steps appear in "
+    "excerpts. Do not invent orchestration phases, agent role splits, or tech-stack components "
+    "not named in the excerpts.\n"
+    "22. For comparison questions (Agent vs LLM vs RAG, agent vs plain LLM), state differences "
+    "ONLY as supported by excerpts — do not add outside definitions. For tech-stack or link "
+    "questions, list ONLY products/URLs explicitly named in excerpts.\n"
+    "23. For agent-role questions, name ONLY roles/agents that appear verbatim in excerpts. If the "
+    "question asks about a role not named (e.g. 'manager agent'), say the excerpts do not use "
+    "that term and cite the closest related agents that ARE named.\n"
+    "24. For URL / link questions, include ONLY URLs or paths that appear verbatim in excerpts — "
+    "never invent github.com, huggingface.co, or other links from outside knowledge.\n"
+    "25. For memory-type or taxonomy questions, use ONLY category names that appear in excerpts "
+    "(e.g. do not introduce 'short-term' / 'long-term' unless those phrases appear).\n\n"
     f"{FEW_SHOT_BALANCED}\n"
     f"{FEW_SHOT_CODE_BALANCED}\n"
     "DOCUMENT EXCERPTS:\n"
@@ -253,6 +349,8 @@ BALANCED_REFINE_PROMPT_TMPL = (
     "Preserve all existing [Source N] tags in the current answer.\n"
     "Add [Source N] tags for any new facts taken from the additional excerpt.\n"
     "Never append the insufficient-information message after a substantive partial answer.\n"
+    "When adding code, copy lines exactly from the new excerpt. Do not invent patterns, roles, "
+    "acronym expansions, or invocation syntax.\n"
     "If the new excerpt does not help, return the current answer unchanged.\n\n"
     "Refined answer:"
 )
@@ -331,8 +429,9 @@ When using policy_search:
    When policy_search returns [Source N] tags, preserve them verbatim in your final response.
    Do not replace tags with page numbers or filenames alone.
 6. For LIST or ENUMERATION questions, answer as a numbered list. If a requested item is missing from the tool output, say it was not found in the retrieved excerpts — do not guess.
-7. When showing code from tool output, copy lines exactly — never invent functions or complete partial snippets.
-8. Abstain only when retrieved text is completely irrelevant or silent on the topic.
+7. When showing code from tool output, copy lines exactly — never invent functions or complete partial snippets. Scan all retrieved text before claiming code is absent.
+8. For named patterns and agent roles, describe only what retrieved text states — do not conflate patterns or invent roles not named in the excerpts. Never expand acronyms unless the excerpt defines them.
+9. Abstain only when retrieved text is completely irrelevant or silent on the topic.
 
 For greetings or capability questions, respond directly without policy_search.
 For follow-ups, expand pronouns from chat history into a complete standalone policy_search query.
@@ -378,6 +477,23 @@ ANSWER:
 {answer}
 
 VERDICT:"""
+
+FAITHFULNESS_CLAIM_TRIM_PROMPT = """You revise an answer to remove ONLY unsupported factual claims.
+
+Rules:
+- Remove or rephrase sentences that state facts, roles, URLs, code, or definitions not in EXCERPTS.
+- Keep supported sentences and all [Source N] tags intact.
+- Do not add new facts. Do not invent abstention boilerplate unless nothing supported remains.
+- If every sentence is unsupported, respond EXACTLY:
+  "{insufficient_message}"
+
+EXCERPTS:
+{context}
+
+ORIGINAL ANSWER:
+{answer}
+
+REVISED ANSWER:"""
 
 CODE_LINE_VALIDATION_PROMPT_STRICT = """You verify whether every line of CODE in an ANSWER appears in the CONTEXT.
 
@@ -514,6 +630,11 @@ def get_faithfulness_guard_prompt(*, mode: GroundingMode | None = None) -> str:
     return FAITHFULNESS_GUARD_BALANCED
 
 
+def get_faithfulness_claim_trim_prompt() -> str:
+    """Prompt for removing unsupported claims while preserving supported content."""
+    return FAITHFULNESS_CLAIM_TRIM_PROMPT
+
+
 def get_code_validation_prompt(
     *,
     mode: str = "balanced",
@@ -580,6 +701,7 @@ def get_generation_config_summary() -> dict[str, str | bool]:
         "strict_grounding": settings.strict_grounding,
         "enable_faithfulness_check": settings.enable_faithfulness_check,
         "faithfulness_guard_mode": settings.faithfulness_guard_mode,
+        "faithfulness_guard_reject_action": settings.faithfulness_guard_reject_action,
         "enable_code_validation": settings.enable_code_validation,
         "enable_code_self_correction": settings.enable_code_self_correction,
         "code_validation_trigger_mode": settings.code_validation_trigger_mode,

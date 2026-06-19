@@ -55,6 +55,8 @@ def test_balanced_agent_prompt_allows_synthesis() -> None:
     assert "synthesize" in prompt.lower() or "MAY synthesize" in prompt
     assert "[Source N]" in prompt
     assert "preserve them verbatim" in prompt
+    assert "do not conflate patterns" in prompt.lower()
+    assert "Never expand acronyms" in prompt
 
 
 def test_strict_text_qa_template_has_few_shot() -> None:
@@ -78,6 +80,21 @@ def test_balanced_text_qa_allows_partial_answers() -> None:
     assert "NEVER append the insufficient-information message" in tmpl
     assert "social media" in tmpl.lower()
     assert "Abstain ONLY" in tmpl
+
+
+def test_balanced_text_qa_faithfulness_rules() -> None:
+    tmpl = get_text_qa_template(strict=False, version="v2_balanced").template
+    assert "19b." in tmpl
+    assert "pattern disambiguation" in tmpl.lower() or "named patterns" in tmpl.lower()
+    assert "Example P" in tmpl
+    assert "Example Q" in tmpl
+    assert "Example R" in tmpl
+    assert "Example S" in tmpl
+    assert "Example M2" in tmpl
+    assert "manager agent" in tmpl.lower()
+    assert "Do NOT attribute properties of one pattern to another" in tmpl
+    assert "24. For URL / link questions" in tmpl
+    assert "Example X" in tmpl
 
 
 def test_balanced_refine_template_preserves_source_tags() -> None:

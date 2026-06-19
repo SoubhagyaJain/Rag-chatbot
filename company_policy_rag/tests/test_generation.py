@@ -101,6 +101,7 @@ def test_balanced_guard_strips_double_ending_before_check(monkeypatch) -> None:
 def test_balanced_guard_rejection_keeps_original_answer(monkeypatch) -> None:
     monkeypatch.setattr("src.generation.settings.enable_faithfulness_check", True)
     monkeypatch.setattr("src.generation.settings.faithfulness_guard_mode", "balanced")
+    monkeypatch.setattr("src.generation.settings.faithfulness_guard_reject_action", "keep")
     mock_llm = MagicMock()
     mock_llm.complete.return_value = "UNSUPPORTED"
     nodes = [
@@ -178,6 +179,30 @@ def test_generate_trace_code_validation_fallback(monkeypatch) -> None:
     assert trace.fallback_reason == "code_validation"
     assert trace.code_validation.triggered
     assert trace.code_validation.fallback_applied
+
+
+def test_balanced_guard_rejection_trims_claims(monkeypatch) -> None:
+    monkeypatch.setattr("src.generation.settings.enable_faithfulness_check", True)
+    monkeypatch.setattr("src.generation.settings.faithfulness_guard_mode", "balanced")
+    monkeypatch.setattr("src.generation.settings.faithfulness_guard_reject_action", "trim")
+    mock_llm = MagicMock()
+    trimmed = (
+        "Based on the available information in the documents, employees receive "
+        "three days of paid sick leave after 120 days [Source 1]."
+    )
+    mock_llm.complete.side_effect = ["UNSUPPORTED", trimmed]
+    nodes = [
+        NodeWithScore(
+            node=TextNode(text="Employees receive three days of paid sick leave."),
+            score=0.9,
+        )
+    ]
+    answer = (
+        f"{trimmed} They also receive unlimited vacation and a company car [Source 1]."
+    )
+    result = apply_faithfulness_guard(answer, nodes, mock_llm)
+    assert result == trimmed
+    assert mock_llm.complete.call_count == 2
 
 
 def test_strict_guard_rejection_abstains(monkeypatch) -> None:

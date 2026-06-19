@@ -28,6 +28,7 @@ from src.prompts import (
     PARTIAL_ANSWER_MIN_CHARS,
     PARTIAL_ANSWER_PREFIX,
     format_nodes_for_prompt,
+    get_faithfulness_claim_trim_prompt,
     get_faithfulness_guard_prompt,
     get_refine_template,
     get_text_qa_template,
@@ -260,6 +261,28 @@ def normalize_balanced_answer(answer: str, *, query: str | None = None) -> str:
     return normalized
 
 
+def _resolve_guard_reject_action() -> str:
+    """Return keep|trim|abstain for balanced-guard reject handling."""
+    return settings.faithfulness_guard_reject_action
+
+
+def _trim_unsupported_claims(answer: str, context: str, llm: LLM) -> str:
+    """Remove unsupported sentences while preserving cited supported content."""
+    prompt = get_faithfulness_claim_trim_prompt().format(
+        insufficient_message=INSUFFICIENT_INFO_MESSAGE,
+        context=context[:6000],
+        answer=answer[:2000],
+    )
+    trimmed = str(llm.complete(prompt)).strip()
+    if not trimmed:
+        return answer
+    if trimmed.startswith(INSUFFICIENT_INFO_MESSAGE):
+        return INSUFFICIENT_INFO_MESSAGE
+    if INSUFFICIENT_INFO_MESSAGE in trimmed and len(trimmed) < PARTIAL_ANSWER_MIN_CHARS:
+        return INSUFFICIENT_INFO_MESSAGE
+    return trimmed
+
+
 def _parse_guard_verdict(raw: str, guard_mode: str) -> bool:
     """
     Return True if answer passes the guard.
@@ -335,9 +358,27 @@ def apply_faithfulness_guard(
             verdict_raw[:30],
         )
         if guard_mode == "balanced":
-            logger.warning(
-                "Faithfulness guard (balanced): keeping original answer to preserve relevancy"
-            )
+            action = _resolve_guard_reject_action()
+            if action == "abstain":
+                return INSUFFICIENT_INFO_MESSAGE
+            if action == "trim":
+                trimmed = _trim_unsupported_claims(normalized, context, judge)
+                if (
+                    trimmed
+                    and trimmed != INSUFFICIENT_INFO_MESSAGE
+                    and len(trimmed.strip()) >= PARTIAL_ANSWER_MIN_CHARS // 2
+                ):
+                    logger.warning(
+                        "Faithfulness guard (balanced): trimmed unsupported claims"
+                    )
+                    return trimmed
+                logger.warning(
+                    "Faithfulness guard (balanced): trim produced no usable answer, keeping original"
+                )
+            else:
+                logger.warning(
+                    "Faithfulness guard (balanced): keeping original answer to preserve relevancy"
+                )
             return normalized
         return INSUFFICIENT_INFO_MESSAGE
     except Exception as exc:
