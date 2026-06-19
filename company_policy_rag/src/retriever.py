@@ -41,6 +41,11 @@ from src.code_retrieval import (
     inject_retrieval_boost_chunks,
     promote_code_tool_nodes,
 )
+from src.policy_topic_pipeline import (
+    ensure_policy_topic_in_results,
+    finalize_policy_topic_context,
+    inject_policy_topic_chunks,
+)
 from src.query_processing import (
     augment_query_for_retrieval,
     build_multi_retrieval_queries,
@@ -403,6 +408,7 @@ class _PostprocessingRetriever:
 
         merged_list = self._apply_scope(list(merged.values()))
         merged_list = inject_retrieval_boost_chunks(merged_list, raw_query)
+        merged_list = inject_policy_topic_chunks(merged_list, raw_query)
         nodes = _diversify_comprehensive_nodes(merged_list, code_query=code_query)
         log_retrieval_stage("chroma_retrieved_comprehensive", nodes)
         primary = QueryBundle(query_str=prepare_retrieval_query(raw_query))
@@ -423,6 +429,7 @@ class _PostprocessingRetriever:
             filtered = ensure_topic_nodes_in_results(filtered, raw_query, nodes)
             filtered = ensure_guidebook_topic_in_results(filtered, raw_query, nodes)
             filtered = ensure_agent_topic_in_results(filtered, raw_query, nodes)
+            filtered = ensure_policy_topic_in_results(filtered, raw_query, nodes)
             if not filtered and nodes:
                 rerank_only = [
                     p
@@ -450,6 +457,7 @@ class _PostprocessingRetriever:
         filtered = expand_to_parent_documents(filtered)
         filtered = finalize_guidebook_topic_context(filtered, raw_query)
         filtered = finalize_agent_topic_context(filtered, raw_query)
+        filtered = finalize_policy_topic_context(filtered, raw_query)
         log_retrieval_stage("post_parent_expand", filtered)
         return filtered
 
@@ -460,6 +468,7 @@ class _PostprocessingRetriever:
             record_stage("chroma_retrieve", t_chroma["elapsed_ms"])
         nodes = self._apply_scope(nodes)
         nodes = inject_retrieval_boost_chunks(nodes, bundle.query_str)
+        nodes = inject_policy_topic_chunks(nodes, bundle.query_str)
         log_retrieval_stage("chroma_retrieved", nodes)
         with timer("rerank_filter") as t_rerank:
             filtered = apply_postprocessors(nodes, bundle, self._postprocessors)
@@ -472,11 +481,15 @@ class _PostprocessingRetriever:
         filtered = ensure_agent_topic_in_results(
             filtered, bundle.query_str, nodes
         )
+        filtered = ensure_policy_topic_in_results(
+            filtered, bundle.query_str, nodes
+        )
         log_retrieval_stage("post_rerank_filter", filtered)
         filtered = promote_code_tool_nodes(filtered, bundle.query_str)
         filtered = expand_to_parent_documents(filtered)
         filtered = finalize_guidebook_topic_context(filtered, bundle.query_str)
         filtered = finalize_agent_topic_context(filtered, bundle.query_str)
+        filtered = finalize_policy_topic_context(filtered, bundle.query_str)
         log_retrieval_stage("post_parent_expand", filtered)
         return filtered
 
