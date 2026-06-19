@@ -73,9 +73,29 @@ def render_sidebar_controls() -> None:
             st.session_state.initialized = False
 
         st.divider()
+        st.subheader("Chat mode")
+        mode_options = ["direct", "agent"]
+        mode_labels = {
+            "direct": "Direct (faster)",
+            "agent": "Agent (follow-ups)",
+        }
+        current_mode = st.session_state.get("chat_mode", "direct")
+        mode_choice = st.radio(
+            "Response mode",
+            options=mode_options,
+            format_func=lambda x: mode_labels[x],
+            index=mode_options.index(current_mode) if current_mode in mode_options else 0,
+            help="Direct skips ReAct routing for faster single-shot Q&A. "
+            "Agent uses memory for multi-turn follow-ups.",
+        )
+        if mode_choice != st.session_state.chat_mode:
+            st.session_state.chat_mode = mode_choice
+
+        st.divider()
         st.subheader("Session")
         if st.button("Clear chat history", use_container_width=True):
             st.session_state.messages = []
+            st.session_state.pending_user_prompt = None
             memory = st.session_state.get("memory")
             if memory is not None:
                 memory.reset()

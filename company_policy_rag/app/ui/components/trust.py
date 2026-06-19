@@ -23,11 +23,12 @@ def render_trust_panel(
     citations: list[dict[str, Any]],
     answer: str,
     grounding_mode: str | None = None,
+    expanded: bool = False,
 ) -> None:
     cited, fallback = citation_quality_summary(citations)
     low_conf = LOW_CONFIDENCE_MESSAGE in answer
 
-    with st.expander("Trust & performance", expanded=False):
+    with st.expander("Trust & performance", expanded=expanded or low_conf):
         if grounding_mode == "strict":
             st.caption("Strict grounding — answers may abstain more often.")
 

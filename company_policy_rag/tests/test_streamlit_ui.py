@@ -5,7 +5,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from app.ui.components.chat import SUGGESTED_PROMPTS
+from src.agent import AgentTurnResult
+
+from app.ui.components.chat import (
+    SUGGESTED_PROMPTS,
+    apply_complete_assistant_turn,
+    apply_queue_user_prompt,
+    stream_answer_chunks,
+)
 from app.ui.components.health import format_eval_metrics, load_last_eval_run, probe_ollama_tags
 from app.ui.components.trust import citation_quality_summary
 from app.ui.session import corpus_scope_filters
@@ -60,6 +67,30 @@ def test_format_eval_metrics():
     assert metrics["Faithfulness"] == "0.807"
     assert metrics["Answer relevancy"] == "0.766"
     assert metrics["Hit rate"] == "0.886"
+
+
+def test_stream_answer_chunks_reconstructs_text():
+    text = "The dress code requires business casual attire."
+    chunks = list(stream_answer_chunks(text, words_per_chunk=2))
+    assert "".join(chunks) == text
+
+
+def test_queue_user_prompt_sets_pending():
+    session: dict = {"messages": []}
+    apply_queue_user_prompt(session, "Hello")
+    assert session["messages"][-1]["content"] == "Hello"
+    assert session["pending_user_prompt"] == "Hello"
+
+
+def test_complete_assistant_turn_clears_pending():
+    session: dict = {
+        "messages": [{"role": "user", "content": "Hi"}],
+        "pending_user_prompt": "Hi",
+    }
+    turn = AgentTurnResult(answer="Answer", citations=[])
+    apply_complete_assistant_turn(session, turn, user_prompt="Hi")
+    assert len(session["messages"]) == 2
+    assert session["pending_user_prompt"] is None
 
 
 def test_probe_ollama_tags_invalid_host():

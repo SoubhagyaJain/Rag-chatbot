@@ -24,6 +24,25 @@ def render_grounding_badge() -> None:
     st.markdown(f'<span class="{css_class}">{label}</span>', unsafe_allow_html=True)
 
 
+def render_sources_compact(citations: list[dict[str, Any]]) -> None:
+    """Single collapsed expander for all sources (ChatGPT-style)."""
+    prepared = prepare_citations_for_display(citations)
+    if not prepared:
+        return
+
+    noun = "source" if len(prepared) == 1 else "sources"
+    with st.expander(f"📚 {len(prepared)} {noun}", expanded=False):
+        for i, citation in enumerate(prepared, 1):
+            label = format_citation_primary(citation)
+            if settings.citation_show_relevance_score and citation.get("score") is not None:
+                label = f"{label} · {citation['score']:.2f}"
+            st.markdown(f"**{i}.** {label}")
+            source_file = citation.get("source_file", "unknown")
+            st.caption(f"`{shorten_source_filename(source_file)}`")
+            if settings.citation_show_excerpts:
+                st.caption(format_citation_excerpt(citation, max_len=280))
+
+
 def render_sources(citations: list[dict[str, Any]]) -> None:
     prepared = prepare_citations_for_display(citations)
     if not prepared:

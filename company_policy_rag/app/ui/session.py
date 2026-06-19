@@ -12,7 +12,14 @@ from llama_index.core.agent import ReActAgent
 from llama_index.core.memory import ChatMemoryBuffer
 
 from src.agent import AgentTurnResult, chat_with_memory, configure_llm, create_agent
+from src.citations import (
+    begin_citation_turn,
+    get_generation_nodes_this_turn,
+    select_citations_for_answer,
+)
 from src.config import settings
+from src.language import append_language_hint
+from src.prompts import LOW_CONFIDENCE_MESSAGE, resolve_grounding_mode
 from src.indexing import (
     configure_llama_index,
     get_collection_stats,
@@ -23,7 +30,7 @@ from src.indexing import (
 from src.memory import create_session_memory
 from src.prompts import resolve_grounding_mode
 from src.retrieval_scope import corpus_retrieval_filters
-from src.retriever import build_retriever
+from src.retriever import build_query_engine, build_retriever
 from src.timing import begin_query_timing, clear_timing, get_current_timing, record_stage
 from src.utils import logger
 
@@ -50,6 +57,7 @@ def corpus_scope_filters(scope: str | None) -> dict[str, str] | None:
 
 def settings_fingerprint() -> str:
     scope = st.session_state.get("corpus_scope", "all")
+    chat_mode = st.session_state.get("chat_mode", "direct")
     return "|".join(
         [
             resolve_grounding_mode(),
@@ -60,6 +68,7 @@ def settings_fingerprint() -> str:
             str(settings.citation_show_excerpts),
             str(settings.citation_show_relevance_score),
             scope,
+            chat_mode,
         ]
     )
 
@@ -73,6 +82,10 @@ def ensure_session_state() -> None:
         st.session_state.corpus_scope = "all"
     if "timing_samples" not in st.session_state:
         st.session_state.timing_samples = []
+    if "chat_mode" not in st.session_state:
+        st.session_state.chat_mode = "direct"
+    if "pending_user_prompt" not in st.session_state:
+        st.session_state.pending_user_prompt = None
 
 
 def initialize_backend(
@@ -96,7 +109,75 @@ def reload_rag_session() -> None:
     st.session_state.initialized = False
     st.session_state.pop("agent", None)
     st.session_state.pop("retriever", None)
+    st.session_state.pop("query_engine", None)
     st.session_state.pop("settings_fingerprint", None)
+
+
+def _extract_query_answer(response: Any) -> str:
+    if response is None:
+        return "I could not generate a response."
+    inner = getattr(response, "response", response)
+    if inner is None:
+        return "I could not generate a response."
+    text = getattr(inner, "response", None) or getattr(inner, "text", None) or inner
+    return str(text).strip()
+
+
+def ensure_query_engine() -> Any:
+    """Cached query engine for direct (fast) chat mode."""
+    fingerprint = settings_fingerprint()
+    if (
+        st.session_state.get("query_engine") is not None
+        and st.session_state.get("query_engine_fingerprint") == fingerprint
+    ):
+        return st.session_state.query_engine
+
+    scope = st.session_state.get("corpus_scope", "all")
+    filters = corpus_scope_filters(scope)
+    index = get_or_create_index()
+    engine = build_query_engine(index, filters=filters)
+    st.session_state.query_engine = engine
+    st.session_state.query_engine_fingerprint = fingerprint
+    return engine
+
+
+def run_direct_turn(query_engine: Any, user_message: str) -> AgentTurnResult:
+    """Single-shot RAG without ReAct agent overhead."""
+    begin_query_timing()
+    t0 = time.perf_counter()
+    try:
+        begin_citation_turn()
+        response = query_engine.query(append_language_hint(user_message))
+        answer = _extract_query_answer(response)
+
+        citations: list[dict[str, Any]] = []
+        if settings.show_citations:
+            generation_nodes = get_generation_nodes_this_turn()
+            citations = select_citations_for_answer(
+                answer,
+                generation_nodes,
+                user_query=user_message,
+            )
+
+        record_stage("e2e", (time.perf_counter() - t0) * 1000)
+        timing = get_current_timing()
+        timing_dict = timing.as_dict() if timing else None
+        if timing_dict:
+            samples: list[float] = st.session_state.get("timing_samples", [])
+            e2e = timing_dict.get("e2e_ms", 0)
+            if e2e:
+                samples.append(float(e2e))
+                st.session_state.timing_samples = samples[-50:]
+
+        return AgentTurnResult(
+            answer=answer,
+            citations=citations,
+            timing=timing_dict,
+            low_confidence=LOW_CONFIDENCE_MESSAGE in answer,
+            grounding_mode=resolve_grounding_mode(),
+        )
+    finally:
+        clear_timing()
 
 
 def run_agent_turn(
@@ -170,6 +251,8 @@ def ensure_backend_ready(*, require_index: bool = True) -> bool:
             st.session_state.agent = agent
             st.session_state.retriever = retriever
             st.session_state.memory = memory
+            st.session_state.query_engine = build_query_engine(_index, filters=filters)
+            st.session_state.query_engine_fingerprint = fingerprint
             st.session_state.initialized = True
             st.session_state.settings_fingerprint = fingerprint
             logger.info(
