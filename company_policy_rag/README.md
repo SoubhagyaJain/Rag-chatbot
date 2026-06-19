@@ -223,7 +223,7 @@ docker compose run --rm app python scripts/index_documents.py
 docker compose up
 ```
 
-Open [http://localhost:8501](http://localhost:8501).
+Open [http://localhost:8501](http://localhost:8501). The container serves the same multipage UI as local dev: **Chat**, **Documents**, and **System Health** (sidebar navigation).
 
 **Useful commands:**
 
@@ -294,7 +294,7 @@ Dataset: `data/eval/golden_subset_ci_smoke.json`. Floors: `data/eval/ci_smoke_ba
 
 **Latest green runs:**
 - RAG CI [#27804469869](https://github.com/SoubhagyaJain/Rag-chatbot/actions/runs/27804469869) — `unit-tests` 222/222 + `eval-smoke` PASS (hit **1.000**, prec **0.896**, rec **0.667**)
-- Docker CD [#27820859129](https://github.com/SoubhagyaJain/Rag-chatbot/actions/runs/27820859129) — published `soubhagya007/rag-chatbot:{latest,main,sha-1fce8b5}`
+- Docker CD [#27822304750](https://github.com/SoubhagyaJain/Rag-chatbot/actions/runs/27822304750) — published `soubhagya007/rag-chatbot:{latest,main,sha-f71cc57}` (multipage Streamlit UI)
 
 CI smoke is retrieval-only; faithfulness is not gated in GitHub Actions today.
 
