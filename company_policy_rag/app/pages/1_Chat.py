@@ -19,7 +19,7 @@ import streamlit as st
 from app.ui.bootstrap import bootstrap_app
 from app.ui.components.chat import render_chat_interface
 from app.ui.components.citations import render_grounding_badge
-from app.ui.session import ensure_backend_ready, ensure_query_engine, ensure_session_state
+from app.ui.session import ensure_backend_ready, ensure_session_state
 from app.ui.sidebar import render_sidebar_controls, render_sidebar_status
 from app.ui.theme import inject_global_styles
 from src.indexing import probe_chroma_index, reset_chroma_client_cache
@@ -74,8 +74,7 @@ render_sidebar_status()
 
 agent = st.session_state.get("agent")
 memory = st.session_state.get("memory")
-query_engine = ensure_query_engine()
 
 st.markdown('<div class="chat-page">', unsafe_allow_html=True)
-render_chat_interface(agent, memory, query_engine)
+render_chat_interface(agent, memory)
 st.markdown("</div>", unsafe_allow_html=True)

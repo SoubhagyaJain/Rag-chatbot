@@ -24,6 +24,27 @@ _CORPUS_DEFAULT_SOURCE_FILE: dict[str, str] = {
 }
 
 
+def resolve_query_filters(query: str, sidebar_scope: str | None) -> dict[str, str] | None:
+    """
+    Choose Chroma metadata filters for a query.
+
+    When sidebar scope is 'all', auto-route handbook vs guidebook questions
+    to prevent cross-corpus noise (e.g. dress code buried under guidebook hits).
+    """
+    scope = (sidebar_scope or "all").lower().strip()
+    if scope in ("policy", "guidebook"):
+        return corpus_retrieval_filters(scope)
+    if scope != "all":
+        return corpus_retrieval_filters(scope)
+
+    from src.query_processing import detect_query_corpus
+
+    inferred = detect_query_corpus(query)
+    if inferred:
+        return corpus_retrieval_filters(inferred)
+    return None
+
+
 def corpus_retrieval_filters(
     corpus: str | None,
     *,

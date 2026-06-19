@@ -101,6 +101,33 @@ _GUIDEBOOK_TOPIC_EXPANSIONS: list[tuple[tuple[str, ...], str]] = [
 ]
 
 
+def _query_matches_triggers(query: str, expansions: list[tuple[tuple[str, ...], str]]) -> bool:
+    q_lower = query.lower()
+    return any(
+        any(trigger in q_lower for trigger in triggers)
+        for triggers, _ in expansions
+    )
+
+
+def detect_query_corpus(query: str) -> str | None:
+    """
+    Infer policy vs guidebook corpus from query text when sidebar scope is 'all'.
+
+    Returns 'policy', 'guidebook', or None if ambiguous.
+    """
+    if is_guidebook_edge_case_query(query):
+        return "policy"
+    if is_code_or_tool_query(query):
+        return "guidebook"
+    if _query_matches_triggers(query, _GUIDEBOOK_TOPIC_EXPANSIONS):
+        if _query_matches_triggers(query, _TOPIC_EXPANSIONS):
+            return None
+        return "guidebook"
+    if _query_matches_triggers(query, _TOPIC_EXPANSIONS):
+        return "policy"
+    return None
+
+
 def augment_query_with_policy_terms(query: str) -> str:
     """
     Append handbook vocabulary when the question signals specific policy topics.
@@ -299,6 +326,8 @@ _GUIDEBOOK_EDGE_CASE_MARKERS = (
     "vacation",
     "pto",
     "sick leave",
+    "sick day",
+    "sick days",
     "nonprofit",
     "leave policy",
     "employee benefits",

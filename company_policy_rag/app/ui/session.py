@@ -29,7 +29,7 @@ from src.indexing import (
 )
 from src.memory import create_session_memory
 from src.prompts import resolve_grounding_mode
-from src.retrieval_scope import corpus_retrieval_filters
+from src.retrieval_scope import corpus_retrieval_filters, resolve_query_filters
 from src.retriever import build_query_engine, build_retriever
 from src.timing import begin_query_timing, clear_timing, get_current_timing, record_stage
 from src.utils import logger
@@ -123,26 +123,30 @@ def _extract_query_answer(response: Any) -> str:
     return str(text).strip()
 
 
-def ensure_query_engine() -> Any:
-    """Cached query engine for direct (fast) chat mode."""
-    fingerprint = settings_fingerprint()
-    if (
-        st.session_state.get("query_engine") is not None
-        and st.session_state.get("query_engine_fingerprint") == fingerprint
-    ):
-        return st.session_state.query_engine
-
+def ensure_query_engine(user_message: str | None = None) -> Any:
+    """Cached query engine; per-query corpus routing when scope is 'all'."""
     scope = st.session_state.get("corpus_scope", "all")
-    filters = corpus_scope_filters(scope)
+    if user_message:
+        filters = resolve_query_filters(user_message, scope)
+    else:
+        filters = corpus_scope_filters(scope)
+    fingerprint = settings_fingerprint()
+    cache_key = f"{fingerprint}|{filters!r}"
+    if st.session_state.get("query_engine_cache_key") == cache_key:
+        cached = st.session_state.get("query_engine")
+        if cached is not None:
+            return cached
+
     index = get_or_create_index()
     engine = build_query_engine(index, filters=filters)
     st.session_state.query_engine = engine
-    st.session_state.query_engine_fingerprint = fingerprint
+    st.session_state.query_engine_cache_key = cache_key
     return engine
 
 
-def run_direct_turn(query_engine: Any, user_message: str) -> AgentTurnResult:
+def run_direct_turn(user_message: str) -> AgentTurnResult:
     """Single-shot RAG without ReAct agent overhead."""
+    query_engine = ensure_query_engine(user_message)
     begin_query_timing()
     t0 = time.perf_counter()
     try:
@@ -185,6 +189,10 @@ def run_agent_turn(
     user_message: str,
     memory: ChatMemoryBuffer | None,
 ) -> AgentTurnResult:
+    scope = st.session_state.get("corpus_scope", "all")
+    if scope == "all" and resolve_query_filters(user_message, scope):
+        return run_direct_turn(user_message)
+
     begin_query_timing()
     t0 = time.perf_counter()
     try:

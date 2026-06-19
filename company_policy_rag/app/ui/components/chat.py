@@ -131,20 +131,20 @@ def render_chat_history() -> None:
             _render_assistant_extras(msg)
 
 
-def _run_turn(prompt: str, agent, memory, query_engine) -> AgentTurnResult:
+def _run_turn(prompt: str, agent, memory) -> AgentTurnResult:
     chat_mode = st.session_state.get("chat_mode", "direct")
     if chat_mode == "agent":
         return run_agent_turn(agent, prompt, memory)
-    return run_direct_turn(query_engine, prompt)
+    return run_direct_turn(prompt)
 
 
-def process_pending_turn(prompt: str, agent, memory, query_engine) -> None:
+def process_pending_turn(prompt: str, agent, memory) -> None:
     """Generate assistant reply for the queued user prompt."""
     with st.chat_message("assistant"):
         placeholder = st.empty()
         placeholder.markdown(TYPING_INDICATOR_HTML, unsafe_allow_html=True)
         try:
-            turn = _run_turn(prompt, agent, memory, query_engine)
+            turn = _run_turn(prompt, agent, memory)
         except Exception as exc:
             turn = AgentTurnResult(
                 answer=f"Sorry, something went wrong: {exc}",
@@ -171,7 +171,7 @@ def process_pending_turn(prompt: str, agent, memory, query_engine) -> None:
     st.rerun()
 
 
-def render_chat_interface(agent, memory, query_engine) -> None:
+def render_chat_interface(agent, memory) -> None:
     """Main chat loop: history, pending generation, and input."""
     st.markdown('<div class="chat-thread">', unsafe_allow_html=True)
 
@@ -184,7 +184,7 @@ def render_chat_interface(agent, memory, query_engine) -> None:
 
     pending = st.session_state.get("pending_user_prompt")
     if pending:
-        process_pending_turn(pending, agent, memory, query_engine)
+        process_pending_turn(pending, agent, memory)
         st.markdown("</div>", unsafe_allow_html=True)
         return
 
