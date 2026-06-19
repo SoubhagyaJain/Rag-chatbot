@@ -252,7 +252,9 @@ def _collection_names(client: chromadb.ClientAPI) -> list[str]:
     """Normalize Chroma list_collections() results across API versions."""
     names: list[str] = []
     for item in client.list_collections():
-        if hasattr(item, "name"):
+        if isinstance(item, str):
+            names.append(item)
+        elif hasattr(item, "name"):
             names.append(str(item.name))
         else:
             names.append(str(item))

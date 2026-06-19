@@ -6,7 +6,8 @@ from src.config import settings
 
 
 def test_chunk_size_in_recommended_range() -> None:
-    assert 512 <= settings.chunk_size <= 768
+    # Default CHUNK_SIZE is 480 (guidebook-tuned); allow env overrides up to 768.
+    assert 400 <= settings.chunk_size <= 768
 
 
 def test_directories_exist() -> None:

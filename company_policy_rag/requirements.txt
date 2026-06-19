@@ -16,6 +16,9 @@ sentence-transformers>=3.0.0
 #   GPU:  pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
 # Verify: python -c "from src.retriever import get_reranker; print(get_reranker())"
 
+# BM25 sparse retrieval (hybrid search)
+rank-bm25>=0.2.2
+
 # Vector database (persistent, metadata filtering)
 chromadb>=0.5.0,<1.0.0
 # chromadb 0.5.x expects posthog 2.x capture(distinct_id, event, properties)
