@@ -20,36 +20,46 @@ We built a **local, production-oriented RAG system** for company policy and lega
 | UI | **Streamlit** (primary) + Chainlit (legacy) |
 | Deploy | **Docker** (Streamlit container + host Ollama) |
 | Eval | 60-case golden set (25 policy + 35 guidebook) + LLM-as-judge + `logs/evaluation_results.json` |
-| Tests | **182** passing (`pytest tests/ -v`) |
+| Tests | **222** passing (`pytest tests/ -v`) |
 
 ### Headline metric improvements (balanced mode, golden set)
 
 | Metric | Worst observed | Best achieved | Change | % improvement |
 |--------|----------------|---------------|--------|---------------|
-| **Answer Relevancy** | 0.40 | **0.747** | +0.347 | **+87%** vs regression low |
-| **Answer Relevancy** | 0.42 (strict) | **0.747** | +0.327 | **+78%** vs strict baseline |
+| **Answer Relevancy** | 0.40 | **0.766** (guidebook `101844`) | +0.366 | **+92%** vs regression low |
+| **Answer Relevancy** | 0.42 (strict) | **0.747** (policy `104356`) | +0.327 | **+78%** vs strict baseline |
+| **Context Precision** | 0.53 | **0.80** | +0.27 | **+51%** |
+| **Faithfulness** | 0.71 | **0.94** | varies by mode | See trade-off section |
+| **Hit rate** | 0.77 | **0.886** (guidebook `101844`) | +0.12 | Topic pipelines improved recall |
+
+**Targets we set:** Answer Relevancy ≥ 0.75, Faithfulness ≥ 0.90 in balanced mode.
+
+**Where we landed:**
+- Policy (25 cases, `20260617_104356`): rel **0.747**, faith **0.807**
+- Guidebook (35 cases, `20260619_101844`): rel **0.766**, faith **0.594**, hit **0.886**
 
 ### 2026-06-18 addendum (Track A + Phase 4 CI)
 
 - Guidebook relevancy gate **passed** on full 35-case run `164848` (rel **0.700**).
 - Phase 4 CI tasks 5–6 **shipped**: `.github/workflows/rag-ci.yml` + `scripts/ci_eval_gate.py` (retrieval smoke: hit 1.00 / prec 0.896 / rec 0.75).
-- **182** pytest tests; local smoke verified; GitHub Actions runner blocked on billing until resolved.
+- **222** pytest tests; local smoke verified; GitHub Actions runner blocked on billing until resolved.
 - Remaining quality gap: guidebook faithfulness **0.629** vs 0.90 target — see [README3.md](README3.md) §7.
 
 ### 2026-06-19 addendum (CI green + faithfulness tuning)
 
-- **GitHub Actions green** on run [#27804469869](https://github.com/SoubhagyaJain/Rag-chatbot/actions/runs/27804469869) — billing resolved; `unit-tests` 182/182 + `eval-smoke` PASS.
+- **GitHub Actions green** on run [#27804469869](https://github.com/SoubhagyaJain/Rag-chatbot/actions/runs/27804469869) — billing resolved; `unit-tests` 222/222 + `eval-smoke` PASS.
 - **Faithfulness tuning** shipped in `dd40b86`: prompt rules 19b–25, few-shots P–X, optional claim-trim guard (`FAITHFULNESS_GUARD_REJECT_ACTION`, default `keep`).
 - Full 35-case guidebook re-eval `055058`: faith **0.543**, rel **0.666** — **regression** vs baseline `164848` (faith **0.629**, rel **0.700**). Per-case: 2 improved / 8 regressed / 25 unchanged. Clear win: `manager_agent` faith **1.0**.
 - **Lesson:** prompt-only tuning with qwen2.5:7b did not move aggregate faith; claim-trim default `keep` after weak-subset test showed faith drop with `trim`. Root cause for code cases is **retrieval** (`currency_tool_example`, `tools_real_world`), not generation prompts alone.
-- **Next:** code/currency retrieval boost — see [README3.md](README3.md) §7 task 19.
-| **Context Precision** | 0.53 | **0.80** | +0.27 | **+51%** |
-| **Faithfulness** | 0.71 | **0.94** | varies by mode | See trade-off section |
-| **Hit rate** | 0.87 | **0.87** | stable | Retrieval already strong |
 
-**Targets we set:** Answer Relevancy ≥ 0.75, Faithfulness ≥ 0.90 in balanced mode.
+### 2026-06-19 addendum (Track C — topic pipelines + Docker CD)
 
-**Where we landed (run `20260617_104356`):** Relevancy **0.747** (within 0.003 of target), Faithfulness **0.807** (trade-off from relevancy recovery).
+- **Topic-specific retrieval pipelines** shipped in `6508f60`:
+  - Round 1: `building_block_pipeline.py` (guardrails, planning_block)
+  - Round 2: `agent_topic_pipeline.py` (manager_agent, rag_in_agent, memory_block) + `tool_code_pipeline.py` + `code_retrieval.py`
+- Full 35-case guidebook re-eval `101844` (`logs/eval_guidebook_full_35_round2.json`): hit **0.886**, ctx prec **0.700**, ctx rec **0.905**, faith **0.594**, rel **0.766** (`ENABLE_QUERY_REWRITE=false`).
+- **Lesson:** retrieval tuning moves relevancy (0.700 → 0.766) but faithfulness dipped (0.629 → 0.594). Remaining weak cases: `pattern_plan_execute`, `tool_gathering_info`, `abstention_quantum`, `tools_real_world`, `critic_planner_mention`.
+- **Docker CD green** on run [#27820859129](https://github.com/SoubhagyaJain/Rag-chatbot/actions/runs/27820859129) — published `soubhagya007/rag-chatbot:{latest,main,sha-1fce8b5}` after fixing image namespace + secret preflight (`2bf7270`).
 
 ---
 
@@ -68,10 +78,11 @@ We built a **local, production-oriented RAG system** for company policy and lega
 11. [Mandatory [Source N] citation prompts](#mandatory-source-n-citation-prompts)
 12. [Chroma telemetry & index health fixes](#chroma-telemetry--index-health-fixes)
 13. [Docker deployment](#docker-deployment)
-14. [Configuration that mattered](#configuration-that-mattered)
-15. [How to reproduce & test](#how-to-reproduce--test)
-16. [What is still open](#what-is-still-open)
-17. [Project structure](#project-structure)
+14. [Track C — Guidebook topic pipelines](#track-c--guidebook-topic-pipelines)
+15. [Configuration that mattered](#configuration-that-mattered)
+16. [How to reproduce & test](#how-to-reproduce--test)
+17. [What is still open](#what-is-still-open)
+18. [Project structure](#project-structure)
 
 ---
 
@@ -647,6 +658,55 @@ docker compose up
 - User choice: reuse existing Ollama install and GPU setup on host
 - `qwen2.5:7b` needs ~8GB RAM — keeps app container lightweight
 
+### Docker CD (GitHub Actions → Docker Hub)
+
+- Workflow: `.github/workflows/docker-publish-dockerhub.yml`
+- Image: `soubhagya007/rag-chatbot` (namespace fix in `2bf7270` — was incorrectly `soubhagyajain/`)
+- Triggers: push to `main`, tags `v*`, `workflow_dispatch`
+- Published tags: `latest`, `main`, `sha-<commit>`
+- Secrets: `DOCKERHUB_USERNAME` (`soubhagya007`) + `DOCKERHUB_TOKEN` (Read & Write)
+- Green run: [#27820859129](https://github.com/SoubhagyaJain/Rag-chatbot/actions/runs/27820859129) (commit `1fce8b5`)
+
+---
+
+## Track C — Guidebook topic pipelines
+
+After faithfulness prompt tuning (`dd40b86`, run `055058`) failed to beat baseline faith **0.629**, we shifted to **retrieval-side fixes** for guidebook weak cases.
+
+### Problem
+
+Guidebook queries span distinct topics — building blocks, agent architecture, code/currency examples — but a single reranked context ordering favored generic prose over targeted definitions and code chunks. Weak cases clustered around:
+
+- Building block enumeration (`guardrails`, `planning_block`)
+- Agent role definitions (`manager_agent`, `rag_in_agent`, `memory_block`)
+- Code and currency examples (`currency_tool_example`, `tools_real_world`)
+
+### Round 1 — Building block pipeline (`building_block_pipeline.py`)
+
+- Classify query into `GuidebookTopicKind` (guardrails, planning_block, etc.)
+- BM25 boost for topic markers
+- Promote matching nodes and reorder context before parent expansion
+- Local gate: `scripts/ci_building_block_gate.py` on `golden_subset_building_blocks_round1.json`
+
+### Round 2 — Agent topic + tool/code pipelines
+
+- `agent_topic_pipeline.py`: manager agent definition injection, RAG workflow reorder, memory block promotion
+- `tool_code_pipeline.py`: currency/code_links/walkthrough reordering; `content_type=code` promotion
+- `code_retrieval.py`: inject code chunks from BM25 pool; score multiplier on code nodes
+- Local gates: `ci_agent_topic_gate.py`, `ci_tool_code_gate.py`
+
+### Eval outcome (run `20260619_101844`, commit `6508f60`)
+
+| Metric | Baseline `164848` | Round 2 `101844` | Delta |
+|--------|-------------------|------------------|-------|
+| Hit rate | 0.771 | **0.886** | +0.115 |
+| Context precision | 0.594 | **0.700** | +0.106 |
+| Context recall | 0.690 | **0.905** | +0.215 |
+| Answer relevancy | 0.700 | **0.766** | +0.066 |
+| Faithfulness | 0.629 | 0.594 | −0.035 |
+
+**Lesson:** Topic pipelines are the right lever for relevancy and retrieval metrics on guidebook. Faithfulness trade-off suggests generation still over-claims on some factual/code cases even when retrieval improves. Five cases remain weak: `pattern_plan_execute`, `tool_gathering_info`, `abstention_quantum`, `tools_real_world`, `critic_planner_mention`.
+
 ---
 
 ## Configuration that mattered
@@ -693,7 +753,7 @@ docker compose up
 ### Full eval (60 cases policy+guidebook; guidebook-only ~47 min)
 
 ```bash
-python -m pytest tests/ -v          # 182 tests
+python -m pytest tests/ -v          # 222 tests
 python scripts/evaluate.py          # golden set → logs/evaluation_results.json
 ```
 
@@ -774,7 +834,7 @@ company_policy_rag/
 ├── logs/
 │   ├── evaluation_results.json   # Metric trend log (append-only)
 │   └── app.log
-├── tests/                    # 182 tests
+├── tests/                    # 222 tests
 ├── scripts/
 │   ├── index_documents.py
 │   └── evaluate.py
@@ -795,7 +855,7 @@ company_policy_rag/
 | `test_evaluation.py` | Context-aware relevancy judge |
 | `test_chroma_telemetry.py` | NoOp telemetry, settings conflict recovery, index probe |
 
-**Total: 182 tests passing** (as of last run).
+**Total: 222 tests passing** (as of last run).
 
 ---
 

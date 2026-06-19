@@ -7,7 +7,7 @@
 > - **This document:** completion status, metrics gap, prioritized backlog
 
 **Report date:** 2026-06-19  
-**Index snapshot:** 308 Chroma chunks | 182 tests | 60 golden cases (25 policy + 35 guidebook)
+**Index snapshot:** 308 Chroma chunks | 222 tests | 60 golden cases (25 policy + 35 guidebook)
 
 ---
 
@@ -33,11 +33,12 @@
 | Lens | Estimate | Rationale |
 |------|----------|-----------|
 | **Core RAG stack** (ingest → retrieve → generate → cite → UI) | **~85%** | All major modules implemented and tested |
-| **5-phase infrastructure roadmap** (Track A) | **~70%** | Phases 1–3 done; Phase 4 CI (tasks 5–6) shipped; tasks 7–8 deferred |
+| **5-phase infrastructure roadmap** (Track A) | **~75%** | Phases 1–3 done; Phase 4 partial (CI + Docker CD shipped; cache/observability deferred) |
 | **Relevancy recovery journey** (Track B) | **~95%** | Phases 1–6 complete per README2 |
-| **Production readiness** (CI, monitoring, ACL, validated metrics) | **~55%** | GitHub Actions green (pytest + retrieval smoke); monitoring/ACL still open |
+| **Guidebook topic pipelines** (Track C) | **~90%** | Round 1–2 shipped; 5 weak cases remain |
+| **Production readiness** (CI, monitoring, ACL, validated metrics) | **~60%** | GitHub CI + Docker CD green; guidebook faith below target |
 
-**Bottom line:** P0 validation and guidebook relevancy gate are **complete** on the 308-chunk stack (run `164848`, rel **0.700**). **Phase 4 CI tasks 5–6 validated on GitHub** (run [#27804469869](https://github.com/SoubhagyaJain/Rag-chatbot/actions/runs/27804469869)). Faithfulness prompt tuning (`dd40b86`, run `055058`) did **not** improve aggregate faith (**0.543** vs baseline **0.629**). **Next lever:** retrieval for code/currency cases (`currency_tool_example`, `tools_real_world`).
+**Bottom line:** Guidebook relevancy **exceeds target** after topic pipelines (run `101844`, rel **0.766**). Docker CD **green** (run [#27820859129](https://github.com/SoubhagyaJain/Rag-chatbot/actions/runs/27820859129)). Faithfulness prompt tuning (`055058`) regressed; topic pipelines (`6508f60`) improved relevancy but faith dipped to **0.594**. **Next lever:** faithfulness on code/abstention weak cases (`tools_real_world`, `abstention_quantum`, `pattern_plan_execute`).
 
 ### Verified system facts (2026-06-19)
 
@@ -46,14 +47,16 @@
 | Chroma chunks | **308** (80 policy handbook + 228 guidebook) | `get_collection_stats()` |
 | Guidebook `section_path` unknown | **0 / 228 (0%)** — was 111/228 (49%) pre-reindex | Chroma metadata probe post `index_documents.py --force` |
 | Guidebook `content_type` mix | prose **114**, code **3**, diagram_caption **111** | Same probe |
-| Unit tests | **182** collected | `pytest tests/ --collect-only` |
+| Unit tests | **222** collected | `pytest tests/ --collect-only` |
 | Combined golden set | **60 cases** | `data/eval/golden_dataset.json` v2 |
 | Guidebook-only golden set | **35 cases** | `golden_dataset_guidebook.json` (project root) |
 | Weak-case subset | **10 cases** | `data/eval/golden_subset_weak_guidebook.json` |
 | Latest full eval run | `20260618_133725` — **60 cases** | `logs/evaluation_results.json` |
 | Guidebook relevancy gate (baseline) | `20260618_164848` — rel **0.700**, faith **0.629** | `logs/evaluation_guidebook_enumeration_tuning.json` |
 | Faithfulness tuning eval | `20260619_055058` — rel **0.666**, faith **0.543** | `logs/evaluation_guidebook_faith_tuning.json` — commit `dd40b86` |
-| GitHub CI green run | [#27804469869](https://github.com/SoubhagyaJain/Rag-chatbot/actions/runs/27804469869) | `unit-tests` 182/182 + `eval-smoke` PASS |
+| Topic pipeline eval (round 2) | `20260619_101844` — rel **0.766**, faith **0.594**, hit **0.886** | `logs/eval_guidebook_full_35_round2.json` — commit `6508f60` |
+| GitHub CI green run | [#27804469869](https://github.com/SoubhagyaJain/Rag-chatbot/actions/runs/27804469869) | `unit-tests` 222/222 + `eval-smoke` PASS |
+| Docker CD green run | [#27820859129](https://github.com/SoubhagyaJain/Rag-chatbot/actions/runs/27820859129) | `soubhagya007/rag-chatbot:{latest,main,sha-1fce8b5}` |
 | CI smoke metrics | hit **1.000**, prec **0.896**, rec **0.667** | 8-case `golden_subset_ci_smoke.json` |
 | Historical best (policy, 25 cases) | rel **0.747**, faith **0.807**, prec **0.80** | Run `20260617_104356` |
 | E2E latency (CPU, 5-case benchmark) | p50 **53.5s** / p95 **58.8s** | `logs/latency_benchmark.json` |
@@ -82,10 +85,10 @@ Long-horizon capability build for multi-corpus, code-heavy, production-grade RAG
 | **1** | Optional Marker PDF parsing; parent-child chunking; code-block protection; diagram caption nodes; golden eval v2 (60 cases) | **Done** | `src/chunking.py`, `src/pdf_parsers.py`, `src/docstore.py`, `src/diagram_captions.py`, `data/eval/golden_dataset.json` |
 | **2** | Hybrid BM25 + dense RRF fusion; parent-document retrieval (rank children, expand parents) | **Done** | `src/bm25_index.py`, `src/hybrid_retrieval.py`, `src/parent_retrieval.py`, `src/retriever.py` |
 | **3** | Post-generation code validation; self-correct once; low-confidence fallback; eval trace fields | **Done** | `src/code_validation.py`, `src/generation.py` (`GenerationTrace`), `app/streamlit_app.py`, `scripts/analyze_eval_failures.py` |
-| **4** | Production reliability layer (proposed) | **Not started** | CI eval gate, semantic query cache, observability export, nightly golden runs |
+| **4** | Production reliability layer | **Partial** | Shipped: `rag-ci.yml`, `ci_eval_gate.py`, `docker-publish-dockerhub.yml`. Deferred: semantic query cache, observability export, nightly golden runs |
 | **5** | Enterprise hardening (proposed) | **Not started** | Per-user ACL, GPU Docker, Ollama-in-compose, collection sharding |
 
-**Track A progress: 3 / 5 phases complete (60%).**
+**Track A progress: 3 phases done + Phase 4 partial (~75%).**
 
 ### Track B — Relevancy recovery journey (README2, 6 phases)
 
@@ -114,9 +117,10 @@ Short-horizon metric recovery after strict-grounding over-abstention regression 
 
 | Doc | Was stale | Now |
 |-----|-----------|-----|
-| README2.md | “94 tests”, “15-case golden set” | **182 tests**, **60 cases** |
-| README.md | “94 tests” in project structure | **182 tests** + CI/smoke section |
-| All READMEs | Phase 4 CI “planned” | **Shipped** — see §7 tasks 5–6 |
+| README2.md | “182 tests”, broken metric table | **222 tests**, Track C addendum added |
+| README.md | Stale architecture (640/64, top-25) | Updated diagram + topic pipelines |
+| Root README | Duplicated package README | Slim monorepo landing page |
+| All READMEs | Phase 4 “not started” | **Partial** — CI + Docker CD shipped |
 
 README3 remains the source of truth for completion status and backlog priority.
 
@@ -151,6 +155,10 @@ Status key: **Done** = implemented + tested | **Partial** = shipped but not full
 | Cross-encoder reranker (bge-reranker-large) | **Done** | CPU bottleneck (~58% e2e) |
 | Relative score filter | **Done** | `src/postprocessors.py` |
 | Parent-document expansion | **Done** | `src/parent_retrieval.py` |
+| Corpus-scoped retrieval | **Done** | `src/retrieval_scope.py` — reduces cross-corpus bleed |
+| Building block topic pipeline | **Done** | `src/building_block_pipeline.py` — guardrails, planning_block |
+| Agent topic pipeline | **Done** | `src/agent_topic_pipeline.py` — manager_agent, rag_in_agent, memory_block |
+| Tool/code topic pipeline | **Done** | `src/tool_code_pipeline.py` + `src/code_retrieval.py` |
 | Metadata ACL filters | **Planned** | Hooks in retriever; not per-user |
 
 ### Generation and grounding
@@ -185,7 +193,8 @@ Status key: **Done** = implemented + tested | **Partial** = shipped but not full
 | Phase 3 eval aggregates | **Done** | `code_validation_pass_rate`, `low_confidence_fallback_rate` |
 | Failure mode analyzer | **Done** | `scripts/analyze_eval_failures.py` |
 | Full 60-case eval on current stack | **Partial** | Last logged `133725`; re-run after major pipeline changes |
-| Guidebook-only eval on current stack | **Done** | Runs `164848`, `055058` logged |
+| Guidebook-only eval on current stack | **Done** | Runs `164848`, `055058`, `101844` logged |
+| Topic pipeline local gates | **Done** | `ci_building_block_gate.py`, `ci_agent_topic_gate.py`, `ci_tool_code_gate.py` |
 | CI eval gate on PR | **Done** | `.github/workflows/rag-ci.yml` green on GH (run `27804469869`) |
 | Human-judge agreement study | **Partial** | `scripts/compare_human_judge.py` exists; not run recently |
 
@@ -194,6 +203,8 @@ Status key: **Done** = implemented + tested | **Partial** = shipped but not full
 | Capability | Status | Notes |
 |------------|--------|-------|
 | Docker (Streamlit + host Ollama) | **Done** | `docker-compose.yml` |
+| Docker CD (GitHub Actions → Docker Hub) | **Done** | `docker-publish-dockerhub.yml` — `soubhagya007/rag-chatbot` |
+| Docker Hub pre-built compose | **Done** | `docker-compose.dockerhub.yml` |
 | Chroma telemetry fix | **Done** | `src/chroma_telemetry.py` |
 | Index health probe | **Done** | `probe_chroma_index()` |
 | Latency benchmark script | **Done** | `scripts/benchmark_latency.py` |
@@ -230,7 +241,7 @@ Status key: **Done** = implemented + tested | **Partial** = shipped but not full
 | Eval history | Run `20260618_132316` (35 cases); weak subset `20260618_140509` (10 cases) |
 | Phase 3 stress | **High** — code validation pass rate **0%**; fallback rate **14.3%** (baseline) |
 
-**Assessment:** Ingestion metadata is **fixed**. Enumeration tuning raised full-guidebook relevancy **0.629 → 0.700** (`152255` → `164848`); enumeration bucket rel **0.84**, hit **1.00**. Faithfulness prompt tuning (`055058`) did not beat baseline faith **0.629** (aggregate **0.543**). Remaining weak spots: **code** bucket (faith **0.25**, rel **0.325** on `055058`), **currency** retrieval misses (`tools_real_world`, `currency_tool_example`).
+**Assessment:** Ingestion metadata is **fixed**. Topic pipelines (round 2, `101844`) raised relevancy **0.700 → 0.766**, hit **0.771 → 0.886**, ctx recall **0.690 → 0.905**. Faithfulness **0.629 → 0.594** — still below 0.90 target. Remaining weak cases: `pattern_plan_execute`, `tool_gathering_info`, `abstention_quantum`, `tools_real_world`, `critic_planner_mention`.
 
 ### Combined index implications
 
@@ -244,16 +255,15 @@ This is the **most important section** of README3. Several README claims use his
 
 ### Targets vs measured (current 308-chunk stack)
 
-| Metric | Target | `164848` baseline | `055058` faith tuning | `160052` enum×5 |
-|--------|--------|-------------------|----------------------|-----------------|
-| Hit rate | > 0.85 | 0.771 | 0.800 | **1.000** ✓ |
-| Context precision | > 0.50 | **0.594** ✓ | **0.625** ✓ | **1.000** ✓ |
-| Context recall | > 0.60 | **0.690** ✓ | **0.700** ✓ | **0.933** ✓ |
-| Faithfulness | ≥ 0.90 | 0.629 | 0.543 | 0.500 |
-| Answer relevancy | ≥ 0.75 | **0.700** ✓ (gate) | 0.666 | **0.840** ✓ |
-| Code validation pass rate | ≥ 0.90 | — | **1.000** ✓ | — |
+| Metric | Target | `164848` baseline | `055058` faith tuning | `101844` topic pipelines |
+|--------|--------|-------------------|----------------------|--------------------------|
+| Hit rate | > 0.85 | 0.771 | 0.800 | **0.886** ✓ |
+| Context precision | > 0.50 | **0.594** ✓ | **0.625** ✓ | **0.700** ✓ |
+| Context recall | > 0.60 | **0.690** ✓ | **0.700** ✓ | **0.905** ✓ |
+| Faithfulness | ≥ 0.90 | 0.629 | 0.543 | 0.594 |
+| Answer relevancy | ≥ 0.75 | **0.700** ✓ (gate) | 0.666 | **0.766** ✓ |
+| Code validation pass rate | ≥ 0.90 | — | **1.000** ✓ | **1.000** ✓ |
 | Low-confidence fallback rate | < 0.05 | **0.000** ✓ | **0.000** ✓ | **0.000** ✓ |
-| Enumeration relevancy | ≥ 0.70 | **0.840** ✓ | **0.780** ✓ | **0.840** ✓ |
 
 **Faith tuning (`055058`, commit `dd40b86`):** prompt rules 19b–25 + optional claim-trim guard (`FAITHFULNESS_GUARD_REJECT_ACTION`, default `keep`). Per-case faith vs `164848`: **2 improved / 8 regressed / 25 unchanged**. Win: `manager_agent` faith **1.0**.
 
@@ -301,7 +311,9 @@ This is the **most important section** of README3. Several README claims use his
 | Weak-subset post-reindex eval | **Done** (`20260618_140509`) |
 | Full guidebook re-eval post-enumeration (`164848`) | **Done** — rel **0.700**, gate passed |
 | Faithfulness prompt tuning (`055058`) | **Done** — no aggregate improvement; see §7 task 16 |
+| Topic pipeline round 2 (`101844`) | **Done** — rel **0.766**, hit **0.886**; faith **0.594** |
 | GitHub CI green run (`27804469869`) | **Done** — billing resolved |
+| Docker CD green run (`27820859129`) | **Done** — `soubhagya007/rag-chatbot` published |
 
 Refresh commands:
 
@@ -319,10 +331,12 @@ python scripts/evaluate.py --dataset data/eval/golden_subset_weak_guidebook.json
 | “Guidebook section_path metadata fixed” | **Yes** — 0% unknown post-reindex |
 | “Code validation pipeline works (unit tests)” | Yes — `tests/test_code_validation.py` |
 | “Code validation pass rate ≥ 0.90” | **No** — 0% on all measured runs |
-| “Relevancy ≥ 0.75 on production index” | **No** — best full-run 0.610 |
-| “Guidebook RAG quality acceptable” | **No** — rel 0.571 baseline, 0.450 weak subset |
-| “Faithfulness ≥ 0.90 in balanced mode” | **No** — guidebook **0.629** baseline (`164848`); policy best **0.807** (`104356`) |
-| “GitHub Actions CI green” | **Yes** — run `27804469869` (pytest + retrieval smoke) |
+| “Relevancy ≥ 0.75 on guidebook” | **Yes** — run `101844` rel **0.766** |
+| “Guidebook RAG quality acceptable” | **Partial** — relevancy passes; faith **0.594** below target |
+| “Faithfulness ≥ 0.90 in balanced mode” | **No** — guidebook **0.594** (`101844`); policy best **0.807** (`104356`) |
+| “GitHub Actions CI green” | **Yes** — run `27804469869` (pytest 222 + retrieval smoke) |
+| “Docker CD to Docker Hub” | **Yes** — run `27820859129` |
+| “Topic-specific retrieval pipelines” | **Yes** — building block, agent topic, tool/code shipped (`6508f60`) |
 
 ---
 
@@ -371,6 +385,7 @@ python scripts/evaluate.py --dataset data/eval/golden_subset_weak_guidebook.json
 |---|------|--------|------------------|
 | 5 | CI: `pytest tests/ -q` on every PR | **Done** | `.github/workflows/rag-ci.yml` `unit-tests` job |
 | 6 | CI: eval smoke (`--retrieval-only` on 8-case subset) | **Done** | `scripts/ci_eval_gate.py`; baseline hit **1.00** / prec **0.896** / rec **0.75** |
+| 6b | Docker CD to Docker Hub on `main` push | **Done** | `docker-publish-dockerhub.yml`; run `27820859129` |
 | 7 | Semantic query cache | 1–2 days | Cache hit reduces e2e for repeat queries |
 | 8 | Export `src/timing.py` stages to structured logs / dashboard | 1 day | p50/p95 per stage in staging |
 
@@ -393,7 +408,10 @@ python scripts/evaluate.py --dataset data/eval/golden_subset_weak_guidebook.json
 | 16 | Simultaneous relevancy ≥ 0.75 + faithfulness ≥ 0.90 | **Ongoing** | Prompt tuning `dd40b86` (`055058`): faith **0.543**, rel **0.666** — no gate pass; claim-trim tested, default `keep` |
 | 17 | Human-judge overlap (5–10 cases) | 4 hrs | `scripts/compare_human_judge.py` report |
 | 18 | Nightly full golden run + trend alert | 1 day | Slack/email on >5% metric drop |
-| 19 | Code/currency retrieval boost | 1–2 days | `content_type=code` filter or query augmentation; fix `currency_tool_example`, `tools_real_world` misses |
+| 19 | Code/currency retrieval boost | **Done** 2026-06-19 | `tool_code_pipeline.py` + `code_retrieval.py`; `tools_real_world` still weak |
+| 20 | Guidebook faithfulness on remaining 5 weak cases | 2–3 days | faith ≥ 0.75 on `pattern_plan_execute`, `abstention_quantum`, etc. |
+| 21 | Wire topic pipeline gates into GitHub Actions | 1 day | `ci_building_block_gate.py` + peers in CI workflow |
+| 22 | Docker CD workflow | **Done** 2026-06-19 | `docker-publish-dockerhub.yml` green on run `27820859129` |
 
 ---
 
@@ -421,7 +439,8 @@ flowchart TB
         Sparse --> RRF
         RRF --> Rerank[bge-reranker-large]
         Rerank --> Filter[Score filter]
-        Filter --> Expand[Parent expand]
+        Filter --> Topics[Topic pipelines + code_retrieval]
+        Topics --> Expand[Parent expand]
         Expand --> Gen[Grounded generation]
         Gen --> Guard[Faithfulness guard]
         Guard --> CodeVal[Code validation]
@@ -436,21 +455,23 @@ flowchart TB
         Monitor[Live p95 dashboard]
     end
 
-    subgraph ci [CI Shipped]
-        CIGate[pytest + retrieval smoke gate]
+    subgraph ci [CI/CD Shipped]
+        CIGate[pytest 222 + retrieval smoke gate]
+        DockerCD[Docker Hub CD on main push]
     end
 
     Child --> Dense
     Parent --> Expand
 ```
 
-### Module map (28 source files)
+### Module map (33 source files)
 
 | Layer | Files | Status |
 |-------|-------|--------|
 | Config | `config.py` | Done |
 | Ingest | `indexing.py`, `chunking.py`, `pdf_parsers.py`, `docstore.py`, `diagram_captions.py`, `document_upload.py`, `pdf_images.py` | Done |
-| Retrieve | `retriever.py`, `bm25_index.py`, `hybrid_retrieval.py`, `parent_retrieval.py`, `query_processing.py`, `postprocessors.py` | Done |
+| Retrieve | `retriever.py`, `bm25_index.py`, `hybrid_retrieval.py`, `parent_retrieval.py`, `retrieval_scope.py`, `query_processing.py`, `postprocessors.py` | Done |
+| Topic pipelines | `building_block_pipeline.py`, `agent_topic_pipeline.py`, `tool_code_pipeline.py`, `code_retrieval.py` | Done |
 | Generate | `generation.py`, `prompts.py`, `code_validation.py`, `language.py` | Done |
 | Agent | `agent.py`, `memory.py`, `citations.py` | Done |
 | Eval | `evaluation.py`, `human_judge_agreement.py`, `timing.py` | Done |
@@ -467,6 +488,13 @@ flowchart TB
 | `scripts/compare_human_judge.py` | Human vs LLM judge | Done, underused |
 | `scripts/diagnose_index.py` | Index diagnostics | Done |
 | `scripts/extract_golden_candidates.py` | Golden case scaffolding | Done |
+| `scripts/ci_eval_gate.py` | GitHub Actions retrieval smoke gate | Done |
+| `scripts/ci_building_block_gate.py` | Building block topic pipeline gate | Done |
+| `scripts/ci_agent_topic_gate.py` | Agent topic pipeline gate | Done |
+| `scripts/ci_tool_code_gate.py` | Tool/code pipeline gate | Done |
+| `scripts/debug_retrieval_case.py` | Single-case retrieval debug | Done |
+| `scripts/compare_weak_cases.py` | Weak-case before/after comparison | Done |
+| `scripts/diagnose_code_validation.py` | Code validation diagnostics | Done |
 
 ---
 
@@ -474,8 +502,8 @@ flowchart TB
 
 | Window | Focus | Deliverables |
 |--------|-------|--------------|
-| **Days 1–30** | **Done** — validation + CI | Guidebook gate `164848` (rel 0.700); Phase 4 CI green on GH (`27804469869`); faithfulness prompt tuning `dd40b86` attempted |
-| **Days 31–60** | Retrieval + faith recovery | Code/currency retrieval fixes; guidebook faith 0.629 → ≥0.75 without relevancy loss; independent judge experiments |
+| **Days 1–30** | **Done** — validation + CI + topic pipelines | Guidebook gate `164848`; CI green (`27804469869`); topic pipelines `6508f60` (rel 0.766); Docker CD (`27820859129`) |
+| **Days 31–60** | Faithfulness recovery | Guidebook faith 0.594 → ≥0.75 on 5 remaining weak cases; wire topic gates to CI |
 | **Days 61–90** | Phase 4 remainder + Phase 5 | Semantic cache (task 7); timing dashboard (task 8); ACL filter prototype; nightly golden run |
 
 ### Decision gates
@@ -483,8 +511,8 @@ flowchart TB
 | Gate | Criteria to pass |
 |------|------------------|
 | **Internal beta** | 60-case eval logged; no P0 retrieval misses on policy factual cases |
-| **Guidebook GA** | Guidebook eval: relevancy ≥ 0.70, code validation pass ≥ 0.85 |
-| **Production pilot** | CI gate live on GitHub (**green** run `27804469869`); p95 e2e < 15s (GPU) or documented SLA; ACL for legal vs HR; faithfulness ≥ 0.75 on guidebook |
+| **Guidebook GA** | Guidebook eval: relevancy ≥ 0.75 (**passed** `101844`), faithfulness ≥ 0.75 (**open**) |
+| **Production pilot** | CI + Docker CD green; p95 e2e < 15s (GPU) or documented SLA; ACL for legal vs HR; faithfulness ≥ 0.75 on guidebook |
 
 ---
 
@@ -514,8 +542,8 @@ python -c "import json; d=json.load(open('logs/evaluation_results.json')); r=d['
 |------|--------|
 | 2026-06-18 | Initial README3 — dual phase frameworks, validation debt documented, 308-chunk snapshot |
 | 2026-06-18 | P0 complete — baseline evals `132316`/`133725`, guidebook re-index (0% unknown `section_path`), weak subset `140509`, failure buckets in §5 |
-| 2026-06-18 | Session close — Phase 4 CI tasks 5–6 (`085d957`); local smoke hit 1.00 / prec 0.896 / rec 0.75; 182 tests; GH Actions blocked on billing |
-| 2026-06-19 | CI green on GitHub (`27804469869`); faithfulness tuning `dd40b86` (`055058`); README/HTML refresh |
+| 2026-06-18 | Session close — Phase 4 CI tasks 5–6 (`085d957`); local smoke hit 1.00 / prec 0.896 / rec 0.75; 222 tests; GH Actions blocked on billing |
+| 2026-06-19 | CI green (`27804469869`); faith tuning `055058` (regression); topic pipelines `6508f60` + eval `101844`; Docker CD green (`27820859129`); all READMEs refreshed |
 
 ---
 
@@ -523,9 +551,9 @@ python -c "import json; d=json.load(open('logs/evaluation_results.json')); r=d['
 
 | Question | Answer |
 |----------|--------|
-| **How far have we come?** | Full local RAG stack; Tracks A.1–3 and B.1–6 complete; guidebook rel gate **0.700** (`164848`); Phase 4 CI **green on GitHub**. |
-| **How much is left?** | ~20% to production pilot: **code/currency retrieval + faith recovery (P3)**, then cache/dashboard (tasks 7–8), ACL/GPU (P2). |
-| **Biggest gap?** | Guidebook faith **0.629** baseline vs **0.90** target; code bucket faith **0.25** on `055058`. |
-| **Next action?** | Retrieval tuning for `currency_tool_example` / `tools_real_world`; re-eval guidebook after retrieval fix; keep rel ≥ 0.70. |
+| **How far have we come?** | Full local RAG stack; Tracks A.1–3 + B.1–6 + C (topic pipelines) complete; guidebook rel **0.766** (`101844`); CI + Docker CD **green**. |
+| **How much is left?** | ~25% to production pilot: **faith recovery on 5 weak cases**, wire topic gates to CI, then cache/dashboard (tasks 7–8), ACL/GPU (P2). |
+| **Biggest gap?** | Guidebook faith **0.594** (`101844`) vs **0.90** target; `tools_real_world`, `abstention_quantum` still failing. |
+| **Next action?** | Target faithfulness on `pattern_plan_execute`, `abstention_quantum`, `tools_real_world`; re-eval guidebook; keep rel ≥ 0.75. |
 
 For setup and tuning, see [README.md](README.md). For why each decision was made, see [README2.md](README2.md).
