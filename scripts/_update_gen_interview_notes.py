@@ -16,13 +16,22 @@ NEW_HEAD = """<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="format-detection" content="telephone=no">
   <meta name="theme-color" content="#e4eaf4">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="mobile-web-app-capable" content="yes">
   <title>Rag-chatbot — Generator Docs · Interview Notes</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    (function () {
+      var r = document.documentElement;
+      r.classList.add('js');
+      if (location.protocol === 'file:') r.classList.add('is-file');
+      if (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '')) r.classList.add('is-mobile');
+    })();
+  </script>
   <style>
 """
 
@@ -51,6 +60,45 @@ GEN_EXTRA_CSS = """
       .step-chip { text-align: center; }
       .code-panel { font-size: 0.72rem; }
     }
+
+    @media (max-width: 900px) {
+      .liquid-bg { display: none !important; }
+      .card, .hero, .glass, .table-wrap, .stat-pill, .badge, .plan-meta,
+      .timeline, .diagram-card, .mobile-header, .file-pill, .step-chip,
+      .source-card, .warn-box, .btn, .back-to-top, footer, code {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+      .card, .hero, .table-wrap, .file-pill, .step-chip, .source-card,
+      .btn, .plan-meta, .timeline, .diagram-card {
+        background: #ffffff !important;
+      }
+      .warn-box { background: #fef3c7 !important; }
+      .file-pill.out { background: #d1fae5 !important; }
+      code {
+        background: #f1f5f9 !important;
+        color: #0f766e !important;
+        border-color: #e2e8f0 !important;
+      }
+      .cmd-box, .code-panel {
+        background: #0f172a !important;
+        color: #e2e8f0 !important;
+      }
+      .cmd-box code { color: #5eead4 !important; background: none !important; }
+      .card p, .card li, section p, section li, .src-field p, .src-field li {
+        color: #334155 !important;
+      }
+      h2, h3, h4, .card-header h3 { color: #0f172a !important; }
+      table th, table td { color: #334155 !important; background: #ffffff !important; }
+      .highlight-row td { background: #ecfdf5 !important; color: #0f172a !important; }
+    }
+
+    html.is-mobile code, html.is-file code {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      background: #f1f5f9 !important;
+      color: #0f766e !important;
+    }
 """
 
 ENHANCED_JS = r"""
@@ -71,8 +119,10 @@ ENHANCED_JS = r"""
       function openMenu() {
         if (!panel) return;
         panel.classList.add('open');
-        backdrop.classList.add('visible');
-        backdrop.setAttribute('aria-hidden', 'false');
+        if (backdrop) {
+          backdrop.classList.add('visible');
+          backdrop.setAttribute('aria-hidden', 'false');
+        }
         document.body.classList.add('menu-open');
         if (toggle) {
           toggle.setAttribute('aria-expanded', 'true');
@@ -83,8 +133,10 @@ ENHANCED_JS = r"""
       function closeMenu() {
         if (!panel) return;
         panel.classList.remove('open');
-        backdrop.classList.remove('visible');
-        backdrop.setAttribute('aria-hidden', 'true');
+        if (backdrop) {
+          backdrop.classList.remove('visible');
+          backdrop.setAttribute('aria-hidden', 'true');
+        }
         document.body.classList.remove('menu-open');
         if (toggle) {
           toggle.setAttribute('aria-expanded', 'false');
@@ -275,14 +327,21 @@ def patch_gen_html(html: str) -> str:
         <p>
           <strong>Rag-chatbot</strong> — Interview Notes Generator Docs · Updated 2026-06-19<br>
           <a href="../../README.md">Repo README</a> ·
-          <a href="../../interview-notes.html">Interview Notes</a> ·
-          <a href="../../project-plans.html">Engineering Plans</a> ·
+          <a href="interview-notes.html">Interview Notes</a> ·
+          <a href="project-plans.html">Engineering Plans</a> ·
           <a href="../../company_policy_rag/README3.md">README3</a> ·
           Docker Hub: <a href="https://hub.docker.com/r/soubhagya007/rag-chatbot" target="_blank" rel="noopener">soubhagya007/rag-chatbot</a> ·
           GitHub: <a href="https://github.com/SoubhagyaJain/Rag-chatbot" target="_blank" rel="noopener">SoubhagyaJain/Rag-chatbot</a>
         </p>
       </footer>""",
     )
+
+    if 'class="file-open-hint"' not in html:
+        html = html.replace(
+            "<body>\n  <div class=\"liquid-bg\"",
+            '<body>\n  <p class="file-open-hint" role="note">Opened from a shared file — if the page looks blank, use your browser&rsquo;s menu and choose <strong>Open with Chrome</strong> or <strong>Safari</strong>.</p>\n  <noscript><p style="padding:1rem;background:#fff3cd;color:#92400e;text-align:center;font-family:system-ui,sans-serif;">JavaScript is off — all content below is still readable; use section headings to navigate.</p></noscript>\n  <div class="liquid-bg"',
+            1,
+        )
 
     html = re.sub(r"\s*<script>.*?</script>\s*</body>", ENHANCED_JS + "\n</body>", html, flags=re.DOTALL)
     return html

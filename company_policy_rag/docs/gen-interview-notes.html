@@ -2,13 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="format-detection" content="telephone=no">
   <meta name="theme-color" content="#e4eaf4">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="mobile-web-app-capable" content="yes">
   <title>Rag-chatbot — Generator Docs · Interview Notes</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    (function () {
+      var r = document.documentElement;
+      r.classList.add('js');
+      if (location.protocol === 'file:') r.classList.add('is-file');
+      if (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '')) r.classList.add('is-mobile');
+    })();
+  </script>
   <style>
 :root {
       --bg-base: #e4eaf4;
@@ -36,8 +45,71 @@
       --tradeoff: #d97706;
       --radius: 20px;
       --radius-sm: 14px;
-      --font-serif: 'DM Serif Display', Georgia, serif;
-      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-serif: Georgia, 'Times New Roman', serif;
+      --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+
+    html.is-file,
+    html.is-mobile {
+      --glass-bg: #ffffff;
+      --glass-bg-strong: #ffffff;
+    }
+
+    html.is-file .liquid-bg,
+    html.is-mobile .liquid-bg {
+      display: none;
+    }
+
+    html.is-file .card,
+    html.is-file .hero,
+    html.is-file .toc,
+    html.is-file .mobile-header,
+    html.is-file .glass,
+    html.is-file .diagram-card,
+    html.is-file .source-card,
+    html.is-file .code-panel,
+    html.is-mobile .card,
+    html.is-mobile .hero,
+    html.is-mobile .toc,
+    html.is-mobile .mobile-header,
+    html.is-mobile .glass,
+    html.is-mobile .diagram-card,
+    html.is-mobile .source-card,
+    html.is-mobile .code-panel {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      background: #ffffff !important;
+    }
+
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      :root {
+        --glass-bg: #ffffff;
+        --glass-bg-strong: #ffffff;
+      }
+      .liquid-bg { display: none; }
+      .card, .hero, .toc, .mobile-header, .glass, .diagram-card, .source-card, .code-panel {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background: #ffffff !important;
+      }
+    }
+
+    .file-open-hint {
+      display: none;
+      position: sticky;
+      top: 0;
+      z-index: 300;
+      padding: 0.65rem 1rem;
+      padding-top: max(0.65rem, env(safe-area-inset-top));
+      background: #0f172a;
+      color: #f8fafc;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      text-align: center;
+    }
+
+    html.is-file .file-open-hint {
+      display: block;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -203,12 +275,11 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(15, 23, 42, 0.4);
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
+      background: rgba(15, 23, 42, 0.45);
       z-index: 150;
       opacity: 0;
       transition: opacity 0.25s ease;
+      -webkit-tap-highlight-color: transparent;
     }
 
     .toc-backdrop.visible {
@@ -881,6 +952,19 @@
       .layout {
         grid-template-columns: 1fr;
         display: block;
+        position: static;
+        z-index: auto;
+      }
+
+      body.menu-open .layout {
+        position: relative;
+        z-index: 170;
+      }
+
+      .toc-backdrop.visible {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        background: rgba(15, 23, 42, 0.5);
       }
 
       .toc {
@@ -891,27 +975,53 @@
         max-width: 88vw;
         height: 100vh;
         height: 100dvh;
-        z-index: 160;
+        z-index: 180;
         transform: translateX(-105%);
         transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-        border-right: 1px solid var(--glass-border);
+        border-right: 1px solid #e2e8f0;
         border-bottom: none;
         padding: 1.25rem 1rem 2rem;
         padding-top: max(1.25rem, env(safe-area-inset-top));
-        box-shadow: var(--glass-shadow-hover);
+        box-shadow: 4px 0 24px rgba(15, 23, 42, 0.15);
+        background: #ffffff !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        color: var(--text-primary);
+        visibility: hidden;
+        pointer-events: none;
       }
 
-      .toc.open { transform: translateX(0); }
+      .toc.open {
+        transform: translateX(0);
+        visibility: visible;
+        pointer-events: auto;
+      }
 
       .toc-close { display: flex; align-items: center; justify-content: center; }
 
-      .toc-title { padding-right: 3rem; }
+      .toc-title {
+        padding-right: 3rem;
+        color: #0f172a;
+      }
 
       .toc nav { display: block; }
+
+      .toc nav a {
+        color: #334155;
+      }
+
+      .toc nav a:hover,
+      .toc nav a.active {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        background: #ccfbf1;
+        color: #0d9488;
+      }
 
       .toc nav .toc-section {
         display: block;
         margin-top: 0.75rem;
+        color: #64748b;
       }
 
       main {
@@ -1096,10 +1206,117 @@
       .code-panel { font-size: 0.72rem; }
     }
 
+    /* Mobile: solid surfaces — backdrop-filter makes body text look blurry on phones */
+    @media (max-width: 900px) {
+      .liquid-bg { display: none !important; }
+
+      .card,
+      .hero,
+      .glass,
+      .table-wrap,
+      .stat-pill,
+      .badge,
+      .plan-meta,
+      .timeline,
+      .diagram-card,
+      .mobile-header,
+      .file-pill,
+      .step-chip,
+      .source-card,
+      .warn-box,
+      .btn,
+      .back-to-top,
+      footer,
+      code {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+
+      .card,
+      .hero,
+      .table-wrap,
+      .file-pill,
+      .step-chip,
+      .source-card,
+      .btn,
+      .plan-meta,
+      .timeline,
+      .diagram-card {
+        background: #ffffff !important;
+      }
+
+      .warn-box { background: #fef3c7 !important; }
+      .file-pill.out { background: #d1fae5 !important; }
+
+      code {
+        background: #f1f5f9 !important;
+        color: #0f766e !important;
+        border-color: #e2e8f0 !important;
+      }
+
+      .cmd-box,
+      .code-panel {
+        background: #0f172a !important;
+        color: #e2e8f0 !important;
+      }
+
+      .cmd-box code { color: #5eead4 !important; background: none !important; }
+
+      .card p,
+      .card li,
+      section p,
+      section li,
+      .src-field p,
+      .src-field li {
+        color: #334155 !important;
+      }
+
+      h2, h3, h4, .card-header h3 {
+        color: #0f172a !important;
+      }
+
+      table th,
+      table td {
+        color: #334155 !important;
+        background: #ffffff !important;
+      }
+
+      .highlight-row td {
+        background: #ecfdf5 !important;
+        color: #0f172a !important;
+      }
+    }
+
+    html.is-mobile code,
+    html.is-file code {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      background: #f1f5f9 !important;
+      color: #0f766e !important;
+    }
+
+    html.is-mobile .card,
+    html.is-mobile .table-wrap,
+    html.is-mobile .file-pill,
+    html.is-mobile .step-chip,
+    html.is-mobile .warn-box,
+    html.is-mobile .btn,
+    html.is-file .card,
+    html.is-file .table-wrap,
+    html.is-file .file-pill,
+    html.is-file .step-chip,
+    html.is-file .warn-box,
+    html.is-file .btn {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+
   </style>
 </head>
 
 <body>
+  <p class="file-open-hint" role="note">Opened from a shared file — if the page looks blank, use your browser&rsquo;s menu and choose <strong>Open with Chrome</strong> or <strong>Safari</strong>.</p>
+  <noscript><p style="padding:1rem;background:#fff3cd;color:#92400e;text-align:center;font-family:system-ui,sans-serif;">JavaScript is off — all content below is still readable; use section headings to navigate.</p></noscript>
   <div class="liquid-bg" aria-hidden="true"><div class="blob blob-1"></div><div class="blob blob-2"></div><div class="blob blob-3"></div><div class="blob blob-4"></div></div>
   <header class="mobile-header">
     <button class="menu-toggle" id="menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="toc-panel"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
@@ -1769,8 +1986,8 @@ html = f'''...{{QB_OPENING}}...{{len(QUESTIONS)}} questions...'''</div>
         <p>
           <strong>Rag-chatbot</strong> — Interview Notes Generator Docs · Updated 2026-06-19<br>
           <a href="../../README.md">Repo README</a> ·
-          <a href="../../interview-notes.html">Interview Notes</a> ·
-          <a href="../../project-plans.html">Engineering Plans</a> ·
+          <a href="interview-notes.html">Interview Notes</a> ·
+          <a href="project-plans.html">Engineering Plans</a> ·
           <a href="../../company_policy_rag/README3.md">README3</a> ·
           Docker Hub: <a href="https://hub.docker.com/r/soubhagya007/rag-chatbot" target="_blank" rel="noopener">soubhagya007/rag-chatbot</a> ·
           GitHub: <a href="https://github.com/SoubhagyaJain/Rag-chatbot" target="_blank" rel="noopener">SoubhagyaJain/Rag-chatbot</a>
@@ -1795,8 +2012,10 @@ html = f'''...{{QB_OPENING}}...{{len(QUESTIONS)}} questions...'''</div>
       function openMenu() {
         if (!panel) return;
         panel.classList.add('open');
-        backdrop.classList.add('visible');
-        backdrop.setAttribute('aria-hidden', 'false');
+        if (backdrop) {
+          backdrop.classList.add('visible');
+          backdrop.setAttribute('aria-hidden', 'false');
+        }
         document.body.classList.add('menu-open');
         if (toggle) {
           toggle.setAttribute('aria-expanded', 'true');
@@ -1807,8 +2026,10 @@ html = f'''...{{QB_OPENING}}...{{len(QUESTIONS)}} questions...'''</div>
       function closeMenu() {
         if (!panel) return;
         panel.classList.remove('open');
-        backdrop.classList.remove('visible');
-        backdrop.setAttribute('aria-hidden', 'true');
+        if (backdrop) {
+          backdrop.classList.remove('visible');
+          backdrop.setAttribute('aria-hidden', 'true');
+        }
         document.body.classList.remove('menu-open');
         if (toggle) {
           toggle.setAttribute('aria-expanded', 'false');
